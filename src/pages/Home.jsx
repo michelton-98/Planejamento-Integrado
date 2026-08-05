@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  computeNomesComContagem,
   computePendenciasPorDisciplina,
   computeStats,
   computeTopEmpresas,
@@ -144,17 +145,21 @@ export default function Home() {
   const topEmpresas = computeTopEmpresas(rowsAtivas, dataReferencia, 5)
   const topEspecialistas = computeTopEspecialistas(rowsAtivas, dataReferencia, 5)
   const pendenciasPorDisciplina = computePendenciasPorDisciplina(rowsAtivas)
+  // Só usada no layout de impressão (print:block), no lugar dos Top 5.
+  const especialistasPendentes = computeNomesComContagem(rowsAtivas, 'especialista')
 
   async function handleExportarPdf() {
     setExportando(true)
     setErroExportacao(null)
     try {
+      // Top 10 no PDF — exclusivo da exportação; os gráficos da tela
+      // continuam em Top 5 (topEmpresas/topEspecialistas acima).
       await gerarRelatorioDiarioPdf({
         dataReferencia,
         ultimaAtualizacao,
         stats,
-        topEmpresas,
-        topEspecialistas,
+        topEmpresas: computeTopEmpresas(rowsAtivas, dataReferencia, 10),
+        topEspecialistas: computeTopEspecialistas(rowsAtivas, dataReferencia, 10),
         pendenciasPorDisciplina,
       })
     } catch (err) {
@@ -195,8 +200,10 @@ export default function Home() {
         </div>
 
         <p className="mb-6 text-xs text-gray-400 print:mb-3">
-          Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO.
-          Só entram nas pendências RDOs de obras com status "Obra em Andamento".
+          Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO.{' '}
+          <span className="print:hidden">
+            Só entram nas pendências RDOs de obras com status "Obra em Andamento".
+          </span>
         </p>
 
         {erroExportacao && (
@@ -247,7 +254,7 @@ export default function Home() {
           />
         </div>
 
-        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2 print:mb-3">
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2 print:hidden">
           <TopBarChart
             titulo="Top 5 empresas com mais pendências atrasadas"
             data={topEmpresas}
@@ -268,6 +275,28 @@ export default function Home() {
 
         <div className="mb-6 print:mb-3">
           <PendenciasPorDisciplina rows={rowsAtivas} dataReferencia={dataReferencia} />
+        </div>
+
+        <div className="hidden print:block">
+          <p className="mb-2 text-sm font-semibold text-navy">
+            Pendências por especialista (Inpasa)
+          </p>
+          {especialistasPendentes.length === 0 ? (
+            <p className="text-xs text-gray-400">Nenhuma pendência de especialista no momento.</p>
+          ) : (
+            <ul className="columns-2 gap-6 text-xs text-navy">
+              {especialistasPendentes.map((item) => (
+                <li
+                  key={item.nome}
+                  className="flex items-baseline justify-between gap-2 border-b border-gray-100 py-0.5"
+                  style={{ breakInside: 'avoid' }}
+                >
+                  <span className="truncate">{item.nome}</span>
+                  <span className="font-semibold">{item.total}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </main>

@@ -1,5 +1,4 @@
 import { jsPDF } from 'jspdf'
-import { autoTable } from 'jspdf-autotable'
 
 // Paleta de marca (mesmos hex usados no restante do dashboard).
 const COR_NAVY = '#12263f'
@@ -215,14 +214,81 @@ function desenharDisciplinas(doc, x, y, largura, pendencias) {
 }
 
 /**
+ * Tabela de ranking (nome + contagem) desenhada manualmente (sem
+ * autoTable — a dependência foi removida por não ter mais uso): título,
+ * cabeçalho com fundo cor de destaque, linhas com zebra. Trunca o que não
+ * couber em `alturaDisponivel` (nunca gera 2ª página) e sinaliza com uma
+ * nota, embora com Top 10 isso raramente aconteça na prática.
+ */
+function desenharTabelaRanking(doc, x, y, largura, titulo, itens, alturaDisponivel) {
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10.5)
+  doc.setTextColor(...hexParaRgb(COR_NAVY))
+  doc.text(titulo, x, y, { maxWidth: largura })
+
+  const yTabela = y + 12
+  const alturaCabecalho = 16
+  const alturaLinha = 13.5
+
+  doc.setFillColor(...hexParaRgb(COR_ACCENT))
+  doc.rect(x, yTabela, largura, alturaCabecalho, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(255, 255, 255)
+  doc.text('NOME', x + 6, yTabela + alturaCabecalho - 5)
+  doc.text('ATRASADAS', x + largura - 6, yTabela + alturaCabecalho - 5, { align: 'right' })
+
+  if (itens.length === 0) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...hexParaRgb(COR_CINZA_TEXTO))
+    doc.text('Sem dados', x + 6, yTabela + alturaCabecalho + 10)
+    return
+  }
+
+  const linhasDisponiveis = Math.max(
+    0,
+    Math.floor((alturaDisponivel - (yTabela - y) - alturaCabecalho) / alturaLinha),
+  )
+  const visiveis = itens.slice(0, linhasDisponiveis)
+  const ocultos = itens.length - visiveis.length
+
+  visiveis.forEach((item, indice) => {
+    const yLinha = yTabela + alturaCabecalho + indice * alturaLinha
+
+    if (indice % 2 === 1) {
+      doc.setFillColor(...hexParaRgb(COR_CINZA_CLARO))
+      doc.rect(x, yLinha, largura, alturaLinha, 'F')
+    }
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(...hexParaRgb(COR_NAVY))
+    doc.text(item.nome, x + 6, yLinha + alturaLinha - 4, { maxWidth: largura - 60 })
+
+    doc.setFont('helvetica', 'bold')
+    doc.text(String(item.total), x + largura - 6, yLinha + alturaLinha - 4, { align: 'right' })
+  })
+
+  if (ocultos > 0) {
+    const yNota = yTabela + alturaCabecalho + visiveis.length * alturaLinha + 10
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(7)
+    doc.setTextColor(...hexParaRgb(COR_CINZA_TEXTO))
+    doc.text(`+ ${ocultos} não exibido(s) por limite de espaço.`, x, yNota)
+  }
+}
+
+/**
  * Gera e baixa (client-side, sem backend) o PDF do relatório de
  * acompanhamento de RDOs, formatado para caber em exatamente 1 página A4
  * (foco executivo: cabeçalho, KPIs, gauges, pendências por disciplina e
- * Top 5 — sem o heatmap nem o explorador de pendências, que não fazem
- * sentido impressos). `stats`, `topEmpresas`, `topEspecialistas` e
- * `pendenciasPorDisciplina` já vêm calculados pelo dashboard
- * (dashboardData.js) — os números do PDF são sempre os mesmos que a tela
- * mostra no momento do clique.
+ * Top 10 empresas/especialistas — sem o heatmap nem o explorador de
+ * pendências, que não fazem sentido impressos). `stats`,
+ * `pendenciasPorDisciplina`, `topEmpresas` e `topEspecialistas` já vêm
+ * calculados pelo dashboard (dashboardData.js) — `topEmpresas`/
+ * `topEspecialistas` aqui são Top 10 (o dashboard interativo continua
+ * mostrando Top 5, sem alteração; o limite maior é só para o PDF).
  */
 export async function gerarRelatorioDiarioPdf({
   dataReferencia,
@@ -276,8 +342,7 @@ export async function gerarRelatorioDiarioPdf({
   doc.setFont('helvetica', 'italic')
   doc.setFontSize(7.5)
   doc.text(
-    'Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO. ' +
-      'Só entram nas pendências RDOs de obras "em andamento".',
+    'Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO.',
     pageWidth / 2,
     100,
     { align: 'center' },
@@ -339,41 +404,28 @@ export async function gerarRelatorioDiarioPdf({
 
   y = yBlocos + 140
 
-  // --- Top 5 empresas / especialistas -----------------------------------
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.setTextColor(...hexParaRgb(COR_NAVY))
-  doc.text('Top 5 com mais pendências atrasadas', MARGEM_X, y)
-  y += 10
+  // --- Top 10 empresas / especialistas, lado a lado ---------------------
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const alturaDisponivel = pageHeight - 34 - y // 34pt de folga acima do rodapé
 
-  const estiloCabecalho = { fillColor: hexParaRgb(COR_ACCENT), textColor: 255, fontSize: 9 }
-  const estiloCorpo = { fontSize: 9, textColor: hexParaRgb(COR_NAVY) }
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MARGEM_X },
-    tableWidth: larguraColuna,
-    head: [['Empresa', 'Atrasadas']],
-    body: topEmpresas.length
-      ? topEmpresas.map((item) => [item.nome, String(item.total)])
-      : [['Sem dados', '']],
-    headStyles: estiloCabecalho,
-    bodyStyles: estiloCorpo,
-    styles: { cellPadding: 5 },
-  })
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MARGEM_X + larguraColuna + gap },
-    tableWidth: larguraColuna,
-    head: [['Especialista', 'Atrasadas']],
-    body: topEspecialistas.length
-      ? topEspecialistas.map((item) => [item.nome, String(item.total)])
-      : [['Sem dados', '']],
-    headStyles: estiloCabecalho,
-    bodyStyles: estiloCorpo,
-    styles: { cellPadding: 5 },
-  })
+  desenharTabelaRanking(
+    doc,
+    xColunaEsquerda,
+    y,
+    larguraColuna,
+    'Top 10 empresas com mais pendências atrasadas',
+    topEmpresas,
+    alturaDisponivel,
+  )
+  desenharTabelaRanking(
+    doc,
+    xColunaDireita,
+    y,
+    larguraColuna,
+    'Top 10 especialistas com mais pendências atrasadas',
+    topEspecialistas,
+    alturaDisponivel,
+  )
 
   desenharRodape(doc, dataReferencia)
 

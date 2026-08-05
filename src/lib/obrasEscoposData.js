@@ -16,8 +16,8 @@ export async function fetchObrasEscopos() {
 
 /**
  * Aplica as linhas válidas de uma importação de planilha na tabela
- * obras_escopos: obra já cadastrada (por numero_contrato, senão por
- * empresa+escopo) tem só o `status` atualizado; obra nova é inserida com
+ * obras_escopos: obra já cadastrada (por empresa+escopo — ver
+ * obraMatching.js) tem só o `status` atualizado; obra nova é inserida com
  * `disciplina: null` (preenchida manualmente depois pela tela). Retorna
  * quantas foram criadas e quantas atualizadas.
  */

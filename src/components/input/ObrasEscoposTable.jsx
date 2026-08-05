@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../lib/AuthContext'
 import {
   DISCIPLINAS,
@@ -12,6 +12,28 @@ import Spinner from '../Spinner'
 import Card from '../Card'
 
 const FORM_VAZIO = { numero_contrato: '', empresa: '', escopo: '', disciplina: '', status: STATUS_PADRAO }
+
+// Compara duas obras por `campo` para a ordenação clicável dos
+// cabeçalhos: numérica para contrato (nulos sempre por último,
+// independente da direção), alfabética (pt-BR) para o resto (nulos —
+// caso de disciplina — também por último).
+function compararObras(a, b, campo) {
+  if (campo === 'numero_contrato') {
+    const na = a.numero_contrato ? Number(a.numero_contrato) : null
+    const nb = b.numero_contrato ? Number(b.numero_contrato) : null
+    if (na === null && nb === null) return 0
+    if (na === null) return 1
+    if (nb === null) return -1
+    return na - nb
+  }
+
+  const va = a[campo]
+  const vb = b[campo]
+  if (!va && vb) return 1
+  if (va && !vb) return -1
+  if (!va && !vb) return 0
+  return String(va).localeCompare(String(vb), 'pt-BR')
+}
 
 /**
  * `prefill`: { numero_contrato, empresa, escopo } vindo do atalho "+
@@ -32,6 +54,11 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
   const [form, setForm] = useState(FORM_VAZIO)
   const [criando, setCriando] = useState(false)
   const [erroForm, setErroForm] = useState(null)
+
+  const [filtroTexto, setFiltroTexto] = useState('')
+  const [filtroDisciplina, setFiltroDisciplina] = useState('')
+  const [filtroStatus, setFiltroStatus] = useState('')
+  const [ordenacao, setOrdenacao] = useState({ campo: 'empresa', direcao: 'asc' })
 
   // Espelha os valores de texto já persistidos no banco (por id), para o
   // onBlur saber se algo mudou de fato antes de gravar.
@@ -197,6 +224,54 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
     }
   }
 
+  const obrasExibidas = useMemo(() => {
+    const termo = filtroTexto.trim().toLowerCase()
+
+    let resultado = obras.filter((obra) => {
+      if (filtroDisciplina && obra.disciplina !== filtroDisciplina) return false
+      if (filtroStatus && obra.status !== filtroStatus) return false
+      if (!termo) return true
+
+      const campos = [obra.numero_contrato, obra.empresa, obra.escopo, obra.disciplina, obra.status]
+      return campos.some((valor) => (valor ?? '').toString().toLowerCase().includes(termo))
+    })
+
+    if (ordenacao.campo) {
+      resultado = [...resultado].sort((a, b) => {
+        const cmp = compararObras(a, b, ordenacao.campo)
+        return ordenacao.direcao === 'desc' ? -cmp : cmp
+      })
+    }
+
+    return resultado
+  }, [obras, filtroTexto, filtroDisciplina, filtroStatus, ordenacao])
+
+  function handleOrdenar(campo) {
+    setOrdenacao((atual) =>
+      atual.campo === campo
+        ? { campo, direcao: atual.direcao === 'asc' ? 'desc' : 'asc' }
+        : { campo, direcao: 'asc' },
+    )
+  }
+
+  function ThOrdenavel({ campo, children }) {
+    const ativo = ordenacao.campo === campo
+    return (
+      <th className="px-3 py-2 text-left font-medium text-gray-500">
+        <button
+          type="button"
+          onClick={() => handleOrdenar(campo)}
+          className="inline-flex items-center gap-1 hover:text-navy"
+        >
+          {children}
+          <span className="text-[10px] text-gray-400">
+            {ativo ? (ordenacao.direcao === 'asc' ? '▲' : '▼') : '⇅'}
+          </span>
+        </button>
+      </th>
+    )
+  }
+
   function CampoTexto({ obra, campo, placeholder }) {
     return (
       <input
@@ -222,20 +297,67 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
         <p className="text-sm text-alert">{error}</p>
       ) : (
         <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={filtroTexto}
+              onChange={(event) => setFiltroTexto(event.target.value)}
+              placeholder="Buscar por contrato, empresa ou escopo..."
+              className="min-w-[16rem] flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none"
+            />
+            <select
+              value={filtroDisciplina}
+              onChange={(event) => setFiltroDisciplina(event.target.value)}
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none"
+            >
+              <option value="">Todas as disciplinas</option>
+              {DISCIPLINAS.map((disciplina) => (
+                <option key={disciplina} value={disciplina}>
+                  {disciplina}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filtroStatus}
+              onChange={(event) => setFiltroStatus(event.target.value)}
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none"
+            >
+              <option value="">Todos os status</option>
+              {STATUS_OFICIAIS.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+            {(filtroTexto || filtroDisciplina || filtroStatus) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroTexto('')
+                  setFiltroDisciplina('')
+                  setFiltroStatus('')
+                }}
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+
           <div className="mb-4 overflow-x-auto rounded-lg border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Contrato</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Empresa</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Disciplina</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Status</th>
+                  <ThOrdenavel campo="numero_contrato">Contrato</ThOrdenavel>
+                  <ThOrdenavel campo="empresa">Empresa</ThOrdenavel>
+                  <ThOrdenavel campo="escopo">Escopo</ThOrdenavel>
+                  <ThOrdenavel campo="disciplina">Disciplina</ThOrdenavel>
+                  <ThOrdenavel campo="status">Status</ThOrdenavel>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {obras.map((obra) => (
+                {obrasExibidas.map((obra) => (
                   <tr key={obra.id}>
                     <td className="px-1 py-1">
                       <CampoTexto obra={obra} campo="numero_contrato" placeholder="—" />
@@ -295,10 +417,12 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
                     </td>
                   </tr>
                 ))}
-                {obras.length === 0 && (
+                {obrasExibidas.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-3 py-4 text-center text-gray-500">
-                      Nenhuma obra cadastrada ainda.
+                      {obras.length === 0
+                        ? 'Nenhuma obra cadastrada ainda.'
+                        : 'Nenhuma obra encontrada com esse filtro.'}
                     </td>
                   </tr>
                 )}

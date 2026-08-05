@@ -20,11 +20,19 @@ export async function fetchRdoRelatorios() {
 const STATUS_OBRA_PADRAO = 'Obra em Andamento'
 
 /**
- * Anexa `status_obra` e `disciplina` a cada RDO, cruzando com
- * `obras_escopos` (por numero_contrato, senão empresa+escopo — ver
- * obraMatching.js). RDOs sem obra correspondente cadastrada recebem
+ * Anexa `status_obra`, `disciplina` e o `numero_contrato` atual a cada
+ * RDO, cruzando com `obras_escopos` por empresa+escopo (ver
+ * obraMatching.js — numero_contrato nunca é critério de busca, só dado
+ * exibido). RDOs sem obra correspondente cadastrada recebem
  * `status_obra: 'Obra em Andamento'` por padrão (nunca são descartados
- * silenciosamente) e `disciplina: null`.
+ * silenciosamente), `disciplina: null` e mantêm o `numero_contrato`
+ * gravado no próprio RDO (melhor do que não mostrar nada).
+ *
+ * O `numero_contrato` sempre reflete o valor atual da obra cadastrada —
+ * não o que foi gravado em rdo_relatorios no momento da importação — para
+ * que editar o contrato de uma obra já cadastrada atualize a exibição em
+ * todo o sistema (explorador, pendências por disciplina, PDF) sem precisar
+ * reimportar nada.
  */
 export function anexarStatusObra(rows, obras) {
   const indice = construirIndiceObras(obras)
@@ -33,6 +41,7 @@ export function anexarStatusObra(rows, obras) {
     const obra = encontrarObraCorrespondente(row, indice)
     return {
       ...row,
+      numero_contrato: obra?.numero_contrato ?? row.numero_contrato ?? null,
       status_obra: obra?.status ?? STATUS_OBRA_PADRAO,
       disciplina: obra?.disciplina ?? null,
     }
