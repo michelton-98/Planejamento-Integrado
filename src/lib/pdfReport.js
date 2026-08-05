@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf'
+import { LOGO_INPASA_BASE64, LOGO_PLAORC_BASE64 } from './logoAssets'
 
 // Paleta de marca (mesmos hex usados no restante do dashboard).
 const COR_NAVY = '#12263f'
@@ -19,24 +20,18 @@ function hexParaRgb(hex) {
   ]
 }
 
-// Carrega um PNG estático (mesmo domínio, sem CORS) e devolve como data URL
-// + proporção largura/altura, para desenhar no PDF com addImage.
-function carregarImagem(src) {
+// Lê a proporção largura/altura de uma logo já embutida como data URL
+// (logoAssets.js). As logos costumavam ser buscadas em tempo de execução
+// via '/logos/*.png' — funcionava em dev mas falhava intermitentemente em
+// produção no Vercel (a imagem não carregava, mesmo com o arquivo commitado
+// e o caminho correto). Embutir como base64 elimina essa requisição de
+// rede por completo: não há mais dependência do servidor estático.
+function carregarImagem(dataUrl) {
   return new Promise((resolve, reject) => {
     const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = img.naturalWidth
-      canvas.height = img.naturalHeight
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0)
-      resolve({
-        dataUrl: canvas.toDataURL('image/png'),
-        aspecto: img.naturalWidth / img.naturalHeight,
-      })
-    }
-    img.onerror = () => reject(new Error(`Não foi possível carregar a imagem: ${src}`))
-    img.src = src
+    img.onload = () => resolve({ dataUrl, aspecto: img.naturalWidth / img.naturalHeight })
+    img.onerror = () => reject(new Error('Não foi possível carregar a logo embutida no PDF.'))
+    img.src = dataUrl
   })
 }
 
@@ -299,8 +294,8 @@ export async function gerarRelatorioDiarioPdf({
   pendenciasPorDisciplina,
 }) {
   const [logoInpasa, logoPlaorc] = await Promise.all([
-    carregarImagem('/logos/inpasa.png'),
-    carregarImagem('/logos/plaorc.png'),
+    carregarImagem(LOGO_INPASA_BASE64),
+    carregarImagem(LOGO_PLAORC_BASE64),
   ])
 
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
@@ -309,7 +304,7 @@ export async function gerarRelatorioDiarioPdf({
   const gap = 12
 
   // --- Cabeçalho -----------------------------------------------------
-  const alturaLogo = 30
+  const alturaLogo = 38
   doc.addImage(logoInpasa.dataUrl, 'PNG', MARGEM_X, 20, alturaLogo * logoInpasa.aspecto, alturaLogo)
   const larguraLogoPlaorc = alturaLogo * logoPlaorc.aspecto
   doc.addImage(
