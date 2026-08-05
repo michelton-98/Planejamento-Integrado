@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* Paleta de marca (INPASA / PLAORC) — usada em todo o app.
+   navy: base/texto/neutro · accent: destaque interativo/informativo ·
+   alert: problema/atenção (uso semântico) · success: positivo/favorável
+   (uso semântico) · gold: detalhe pontual (uso restrito).
+   navy+accent+alert validados para uso categórico com
+   scripts/validate_palette.js do skill dataviz — ver conversa para o
+   relatório. success validado à parte (contraste 4.38:1 sobre branco). */
+@theme {
+  --color-navy: #12263f;
+  --color-accent: #2f6fed;
+  --color-alert: #d1495b;
+  --color-success: #178a54;
+  --color-gold: #a9791f;
+  --color-surface: #f5f6f8;
+}
+
+body {
+  margin: 0;
+}
