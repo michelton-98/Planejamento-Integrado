@@ -152,11 +152,14 @@ export default function Home() {
     setExportando(true)
     setErroExportacao(null)
     try {
+      // Top 10 no PDF — exclusivo da exportação; os gráficos da tela
+      // continuam em Top 5 (topEmpresas/topEspecialistas acima).
       await gerarRelatorioDiarioPdf({
-        rows: rowsAtivas,
         dataReferencia,
         ultimaAtualizacao,
         stats,
+        topEmpresas: computeTopEmpresas(rowsAtivas, dataReferencia, 10),
+        topEspecialistas: computeTopEspecialistas(rowsAtivas, dataReferencia, 10),
         pendenciasPorDisciplina,
       })
     } catch (err) {

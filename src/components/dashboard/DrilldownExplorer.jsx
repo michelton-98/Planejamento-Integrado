@@ -56,7 +56,18 @@ export default function DrilldownExplorer({
   return (
     <Card faixaCor="#12263f" categoria="Explorador">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-medium text-navy">Explorar pendências</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-medium text-navy">Explorar pendências</h3>
+          {selecionado && (
+            <button
+              type="button"
+              onClick={() => onSelecionadoChange(null)}
+              className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+            >
+              <span aria-hidden="true">✕</span> Limpar seleção
+            </button>
+          )}
+        </div>
 
         <div className="inline-flex rounded-md border border-gray-200 p-0.5" role="group">
           <button

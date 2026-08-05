@@ -3,8 +3,11 @@
 // tanto no merge de importação (obrasEscoposData.js) quanto no filtro do
 // dashboard por status de obra (dashboardData.js).
 //
-// Regra: numero_contrato quando disponível nos dois lados; senão, empresa +
-// escopo com tolerância a diferença de maiúsculas/espaços/acentos.
+// Regra: empresa + escopo é SEMPRE a chave de vínculo (com tolerância a
+// diferença de maiúsculas/espaços/acentos). numero_contrato não é único
+// (uma empresa pode ter vários contratos, e um mesmo contrato pode cobrir
+// vários escopos) — por isso nunca é usado como critério de busca, só
+// como dado complementar exibido a partir da obra encontrada.
 
 /** Chave normalizada de "empresa + escopo" — case/acento/espaço-insensível. */
 export function normalizarChaveObra(empresa, escopo) {
@@ -19,41 +22,26 @@ export function normalizarChaveObra(empresa, escopo) {
   return `${normalizar(empresa)}|${normalizar(escopo)}`
 }
 
-function normalizarContrato(numeroContrato) {
-  const texto = String(numeroContrato ?? '').trim()
-  return texto || null
-}
-
-/** Monta os dois índices (por contrato e por empresa+escopo) usados na busca. */
+/** Monta o índice por empresa+escopo usado na busca. */
 export function construirIndiceObras(obras) {
-  const porContrato = new Map()
   const porChave = new Map()
 
   for (const obra of obras) {
-    const contrato = normalizarContrato(obra.numero_contrato)
-    if (contrato && !porContrato.has(contrato)) {
-      porContrato.set(contrato, obra)
-    }
     const chave = normalizarChaveObra(obra.empresa, obra.escopo)
     if (!porChave.has(chave)) {
       porChave.set(chave, obra)
     }
   }
 
-  return { porContrato, porChave }
+  return { porChave }
 }
 
 /**
- * Encontra a obra correspondente a `item` (precisa de `numero_contrato`,
- * `empresa`, `escopo`) usando os índices de `construirIndiceObras`.
- * Retorna `null` se nenhuma obra bater.
+ * Encontra a obra correspondente a `item` (precisa de `empresa`, `escopo`)
+ * usando o índice de `construirIndiceObras`. Retorna `null` se nenhuma
+ * obra bater.
  */
-export function encontrarObraCorrespondente(item, { porContrato, porChave }) {
-  const contrato = normalizarContrato(item.numero_contrato)
-  if (contrato && porContrato.has(contrato)) {
-    return porContrato.get(contrato)
-  }
-
+export function encontrarObraCorrespondente(item, { porChave }) {
   const chave = normalizarChaveObra(item.empresa, item.escopo)
   return porChave.get(chave) ?? null
 }
