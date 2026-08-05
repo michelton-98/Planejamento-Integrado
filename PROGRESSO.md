@@ -131,6 +131,23 @@ PDF gerado no navegador com `jspdf` + `jspdf-autotable`. Deploy na Vercel.
   `rdoImportParser.js` (RDOs) e pelo novo `obrasEscoposParser.js`
   (Escopos - Rondonópolis).
 
+### 6. Notificação por e-mail de novo cadastro
+- Edge Function `supabase/functions/notificar-novo-cadastro/index.ts`
+  (Deno): recebe o payload de um trigger de banco, rebusca o perfil por
+  `id` (nunca confia no corpo recebido — evita e-mail forjado se alguém
+  descobrir a URL), busca todos os admins aprovados em `perfis` e envia
+  e-mail via API do Resend (`RESEND_API_KEY`, secret da function — **não
+  está no código**, ver Pendências).
+- Trigger `trg_notificar_novo_cadastro` (migration `0008`) em
+  `public.perfis`, `after insert ... when (new.status_aprovacao =
+  'pendente')`, via `supabase_functions.http_request()` (mesmo mecanismo
+  interno de "Database Webhooks" do painel, só que versionado como
+  migration). O header `Authorization` usa a publishable/anon key do
+  projeto (pública, mesma do `.env`) só pra passar a checagem de JWT da
+  function — não dá acesso a nada sensível.
+- **Ainda não deployada** — Edge Functions não são aplicadas por SQL
+  Editor. Ver Pendências para o passo a passo (CLI ou painel).
+
 ## Decisões técnicas relevantes
 
 - **`xlsx` via CDN do SheetJS, não do npm**: a versão no registro do npm
@@ -184,12 +201,26 @@ supabase/migrations/
   0004_numero_contrato.sql             Coluna numero_contrato + correção retroativa
   0005_rdo_relatorios_somente_admin.sql      Insert restrito a admins
   0006_obras_escopos.sql               Tabela obras_escopos ("Escopos - Rondonópolis") + RLS
+  0007_rdo_relatorios_admin_delete.sql       Policy de DELETE em rdo_relatorios pra admins
+  0008_notificar_novo_cadastro_trigger.sql   Trigger -> Edge Function no novo cadastro
+
+supabase/functions/
+  notificar-novo-cadastro/index.ts     E-mail aos admins via Resend (novo cadastro pendente)
 
 vercel.json                            Rewrite de SPA para a Vercel
 ```
 
 ## Pendências / próximos passos
 
+- **Deployar a Edge Function `notificar-novo-cadastro`** e configurar a
+  secret `RESEND_API_KEY` (e opcionalmente `RESEND_FROM_EMAIL`) no
+  Supabase — ver instruções detalhadas na resposta que entregou essa
+  função (Dashboard → Edge Functions, ou `supabase functions deploy` via
+  CLI). Sem isso, o trigger `0008` chama uma function que não existe e a
+  chamada HTTP falha silenciosamente (não trava o cadastro do usuário,
+  só o e-mail não sai).
+- **Aplicar as migrations `0006` a `0008` no Supabase** (SQL Editor, na
+  ordem) — `0006`/`0007` já eram pendentes de sessões anteriores.
 - **Aplicar a migration `0006_obras_escopos.sql` no Supabase** (SQL
   Editor) — ainda não foi aplicada. Sem ela, a nova seção "Escopos -
   Rondonópolis" em `/input` e o filtro do dashboard por status de obra não
