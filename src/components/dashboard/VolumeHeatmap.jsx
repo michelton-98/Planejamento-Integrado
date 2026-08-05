@@ -51,13 +51,8 @@ export default function VolumeHeatmap({ rows, dataReferencia }) {
 
   return (
     <Card faixaCor="#2f6fed" categoria="Volume" titulo="Volume de RDOs recebidos — últimos ~90 dias">
-      <p className="-mt-3 mb-4 text-xs text-gray-500">
-        Contagem por data do RDO. Passe o mouse (ou toque) num dia para ver o total; clique para ver
-        a lista.
-      </p>
-
       <div className="overflow-x-auto pb-2">
-        <div className="inline-flex gap-[3px]">
+        <div className="inline-flex gap-[6px]">
           {semanas.map((semana, indiceSemana) => {
             const primeiroDiaValido = semana.find((d) => d.dentroDoIntervalo)
             let rotuloMes = null
@@ -67,11 +62,11 @@ export default function VolumeHeatmap({ rows, dataReferencia }) {
             }
 
             return (
-              <div key={indiceSemana} className="flex flex-col gap-[3px]">
-                <div className="h-3 text-[10px] leading-3 text-gray-400">{rotuloMes ?? ''}</div>
+              <div key={indiceSemana} className="flex flex-col gap-[6px]">
+                <div className="h-5 text-xs leading-5 text-gray-400">{rotuloMes ?? ''}</div>
                 {semana.map((dia) => {
                   if (!dia.dentroDoIntervalo) {
-                    return <div key={dia.data} className="h-[11px] w-[11px]" />
+                    return <div key={dia.data} className="h-5 w-5" />
                   }
 
                   const nivel = nivelHeatmap(dia.contagem, maxContagem)
@@ -104,7 +99,7 @@ export default function VolumeHeatmap({ rows, dataReferencia }) {
                       onBlur={() => setTooltip(null)}
                       aria-label={`${formatarDataBR(dia.data)}: ${dia.contagem} RDO(s)`}
                       aria-pressed={selecionado}
-                      className="h-[11px] w-[11px] rounded-sm transition-transform hover:scale-125 focus:scale-125 focus:outline-none"
+                      className="h-5 w-5 rounded-sm transition-transform hover:scale-110 focus:scale-110 focus:outline-none"
                       style={{
                         backgroundColor: CORES_NIVEL[nivel],
                         boxShadow: selecionado ? '0 0 0 2px #a9791f' : 'none',
@@ -128,10 +123,10 @@ export default function VolumeHeatmap({ rows, dataReferencia }) {
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400">
+      <div className="mt-4 flex items-center gap-2 text-xs text-gray-400">
         <span>Menos</span>
         {CORES_NIVEL.map((cor) => (
-          <span key={cor} className="h-[11px] w-[11px] rounded-sm" style={{ backgroundColor: cor }} />
+          <span key={cor} className="h-5 w-5 rounded-sm" style={{ backgroundColor: cor }} />
         ))}
         <span>Mais</span>
       </div>

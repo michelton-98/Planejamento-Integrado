@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf'
-import { autoTable } from 'jspdf-autotable'
+import { computeNomesComContagem } from './dashboardData'
 
 // Paleta de marca (mesmos hex usados no restante do dashboard).
 const COR_NAVY = '#12263f'
@@ -215,21 +215,95 @@ function desenharDisciplinas(doc, x, y, largura, pendencias) {
 }
 
 /**
+ * Lista (em 2 colunas, pra caber mais nomes por página) de todos os
+ * especialistas Inpasa com pendência de aprovação, do maior pro menor —
+ * desenhada manualmente (sem autoTable) para garantir que nunca ultrapassa
+ * `alturaDisponivel` e nunca gera uma 2ª página: o que não couber é
+ * cortado e sinalizado com uma nota no final.
+ */
+function desenharListaEspecialistas(doc, x, y, largura, itens, alturaDisponivel) {
+  if (itens.length === 0) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...hexParaRgb(COR_CINZA_TEXTO))
+    doc.text('Nenhuma pendência de especialista no momento.', x, y)
+    return
+  }
+
+  const alturaCabecalho = 14
+  const alturaLinha = 14
+  const numColunas = 2
+  const espacoEntreColunas = 20
+  const larguraColuna = (largura - espacoEntreColunas * (numColunas - 1)) / numColunas
+
+  const linhasPorColuna = Math.max(1, Math.floor((alturaDisponivel - alturaCabecalho) / alturaLinha))
+  const capacidadeTotal = linhasPorColuna * numColunas
+
+  const visiveis = itens.slice(0, capacidadeTotal)
+  const ocultos = itens.length - visiveis.length
+
+  for (let coluna = 0; coluna < numColunas; coluna++) {
+    const xColuna = x + coluna * (larguraColuna + espacoEntreColunas)
+    if (coluna * linhasPorColuna >= visiveis.length) break
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...hexParaRgb(COR_CINZA_TEXTO))
+    doc.text('ESPECIALISTA', xColuna, y)
+    doc.text('PEND.', xColuna + larguraColuna, y, { align: 'right' })
+  }
+
+  const yLinhas = y + alturaCabecalho
+
+  visiveis.forEach((item, indice) => {
+    const coluna = Math.floor(indice / linhasPorColuna)
+    const linha = indice % linhasPorColuna
+    const xColuna = x + coluna * (larguraColuna + espacoEntreColunas)
+    const yLinha = yLinhas + linha * alturaLinha
+
+    if (linha % 2 === 1) {
+      doc.setFillColor(...hexParaRgb(COR_CINZA_CLARO))
+      doc.rect(xColuna - 4, yLinha - 9.5, larguraColuna + 8, alturaLinha, 'F')
+    }
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...hexParaRgb(COR_NAVY))
+    doc.text(item.nome, xColuna, yLinha, { maxWidth: larguraColuna - 28 })
+
+    doc.setFont('helvetica', 'bold')
+    doc.text(String(item.total), xColuna + larguraColuna, yLinha, { align: 'right' })
+  })
+
+  if (ocultos > 0) {
+    const yNota = yLinhas + linhasPorColuna * alturaLinha + 12
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...hexParaRgb(COR_CINZA_TEXTO))
+    doc.text(
+      `+ ${ocultos} especialista(s) não exibido(s) por limite de espaço na página.`,
+      x,
+      yNota,
+    )
+  }
+}
+
+/**
  * Gera e baixa (client-side, sem backend) o PDF do relatório de
  * acompanhamento de RDOs, formatado para caber em exatamente 1 página A4
- * (foco executivo: cabeçalho, KPIs, gauges, pendências por disciplina e
- * Top 5 — sem o heatmap nem o explorador de pendências, que não fazem
- * sentido impressos). `stats`, `topEmpresas`, `topEspecialistas` e
+ * (foco executivo: cabeçalho, KPIs, gauges, pendências por disciplina e a
+ * lista de especialistas com pendência — sem o heatmap nem o explorador de
+ * pendências, que não fazem sentido impressos). `stats` e
  * `pendenciasPorDisciplina` já vêm calculados pelo dashboard
- * (dashboardData.js) — os números do PDF são sempre os mesmos que a tela
- * mostra no momento do clique.
+ * (dashboardData.js); `rows` é o mesmo universo já filtrado (rowsAtivas) —
+ * os números do PDF são sempre os mesmos que a tela mostra no momento do
+ * clique.
  */
 export async function gerarRelatorioDiarioPdf({
+  rows,
   dataReferencia,
   ultimaAtualizacao,
   stats,
-  topEmpresas,
-  topEspecialistas,
   pendenciasPorDisciplina,
 }) {
   const [logoInpasa, logoPlaorc] = await Promise.all([
@@ -276,8 +350,7 @@ export async function gerarRelatorioDiarioPdf({
   doc.setFont('helvetica', 'italic')
   doc.setFontSize(7.5)
   doc.text(
-    'Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO. ' +
-      'Só entram nas pendências RDOs de obras "em andamento".',
+    'Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO.',
     pageWidth / 2,
     100,
     { align: 'center' },
@@ -339,41 +412,22 @@ export async function gerarRelatorioDiarioPdf({
 
   y = yBlocos + 140
 
-  // --- Top 5 empresas / especialistas -----------------------------------
+  // --- Pendências por especialista (Inpasa) -----------------------------
+  // Todos os especialistas com pendência, do maior pro menor — sem limite
+  // de 5, mostrando quantos couberem no espaço restante da página (nunca
+  // gera uma 2ª página; o que não couber é sinalizado, não cortado em
+  // silêncio).
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
   doc.setTextColor(...hexParaRgb(COR_NAVY))
-  doc.text('Top 5 com mais pendências atrasadas', MARGEM_X, y)
-  y += 10
+  doc.text('Pendências por especialista (Inpasa)', MARGEM_X, y)
+  y += 18
 
-  const estiloCabecalho = { fillColor: hexParaRgb(COR_ACCENT), textColor: 255, fontSize: 9 }
-  const estiloCorpo = { fontSize: 9, textColor: hexParaRgb(COR_NAVY) }
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const alturaDisponivel = pageHeight - 34 - y // 34pt de folga acima do rodapé
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MARGEM_X },
-    tableWidth: larguraColuna,
-    head: [['Empresa', 'Atrasadas']],
-    body: topEmpresas.length
-      ? topEmpresas.map((item) => [item.nome, String(item.total)])
-      : [['Sem dados', '']],
-    headStyles: estiloCabecalho,
-    bodyStyles: estiloCorpo,
-    styles: { cellPadding: 5 },
-  })
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MARGEM_X + larguraColuna + gap },
-    tableWidth: larguraColuna,
-    head: [['Especialista', 'Atrasadas']],
-    body: topEspecialistas.length
-      ? topEspecialistas.map((item) => [item.nome, String(item.total)])
-      : [['Sem dados', '']],
-    headStyles: estiloCabecalho,
-    bodyStyles: estiloCorpo,
-    styles: { cellPadding: 5 },
-  })
+  const especialistas = computeNomesComContagem(rows, 'especialista')
+  desenharListaEspecialistas(doc, MARGEM_X, y, larguraUtil, especialistas, alturaDisponivel)
 
   desenharRodape(doc, dataReferencia)
 

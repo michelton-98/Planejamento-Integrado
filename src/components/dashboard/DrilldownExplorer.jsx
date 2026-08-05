@@ -47,7 +47,11 @@ export default function DrilldownExplorer({
     onSelecionadoChange(null)
   }
 
-  const colunaOutro = tipo === 'contratada' ? 'Especialista' : 'Contratada'
+  // Do lado "Contratada", o "outro" é o responsável pela contratada
+  // naquele estágio (responsavel_nome) — não é um especialista Inpasa,
+  // então o rótulo correto é "Responsável". Do lado "Especialista", o
+  // "outro" é de fato a empresa contratada.
+  const colunaOutro = tipo === 'contratada' ? 'Responsável' : 'Contratada'
 
   return (
     <Card faixaCor="#12263f" categoria="Explorador">
