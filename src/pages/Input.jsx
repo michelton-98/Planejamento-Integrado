@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabaseClient'
 import { parseRdoFile } from '../lib/rdoImportParser'
 import Spinner from '../components/Spinner'
 import Card from '../components/Card'
+import ObrasEscoposImport from '../components/input/ObrasEscoposImport'
+import ObrasEscoposTable from '../components/input/ObrasEscoposTable'
+import RdosSemObra from '../components/input/RdosSemObra'
 
 export default function Input() {
   const { user } = useAuth()
@@ -15,6 +18,13 @@ export default function Input() {
   const [parsing, setParsing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitMessage, setSubmitMessage] = useState(null)
+
+  // Compartilhados entre RdosSemObra e ObrasEscoposTable: `refreshToken`
+  // faz RdosSemObra recalcular a lista sempre que uma obra é criada/editada
+  // (ou um lote de RDOs é importado); `prefillObra` é o atalho "+
+  // Cadastrar esta obra" pré-preenchendo o formulário de nova obra.
+  const [refreshToken, setRefreshToken] = useState(0)
+  const [prefillObra, setPrefillObra] = useState(null)
 
   const ocupado = parsing || submitting
   const validRows = rows.filter((row) => row.erros.length === 0)
@@ -74,6 +84,7 @@ export default function Input() {
     setRows([])
     setFileName('')
     if (fileInputRef.current) fileInputRef.current.value = ''
+    setRefreshToken((atual) => atual + 1)
   }
 
   return (
@@ -195,6 +206,17 @@ export default function Input() {
             )}
           </>
         )}
+
+        <RdosSemObra refreshToken={refreshToken} onSolicitarCadastro={setPrefillObra} />
+
+        <div className="my-10 border-t border-gray-200" />
+
+        <ObrasEscoposImport onImportado={() => setRefreshToken((atual) => atual + 1)} />
+        <ObrasEscoposTable
+          prefill={prefillObra}
+          onPrefillConsumido={() => setPrefillObra(null)}
+          onMudanca={() => setRefreshToken((atual) => atual + 1)}
+        />
       </div>
     </main>
   )

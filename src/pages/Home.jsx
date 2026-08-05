@@ -1,20 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  computeDailySeries,
+  computePendenciasPorDisciplina,
   computeStats,
   computeTopEmpresas,
   computeTopEspecialistas,
   computeUltimaAtualizacao,
   fetchRdoRelatorios,
+  filtrarRdosEmAndamento,
   inicioDoDiaLocal,
 } from '../lib/dashboardData'
+import { fetchObrasEscopos } from '../lib/obrasEscoposData'
 import { gerarRelatorioDiarioPdf } from '../lib/pdfReport'
 import StatCard from '../components/dashboard/StatCard'
-import DailyPendingChart from '../components/dashboard/DailyPendingChart'
 import TopBarChart from '../components/dashboard/TopBarChart'
 import DrilldownExplorer from '../components/dashboard/DrilldownExplorer'
 import VolumeHeatmap from '../components/dashboard/VolumeHeatmap'
-import RankingEscoposAtrasados from '../components/dashboard/RankingEscoposAtrasados'
+import GaugesRow from '../components/dashboard/GaugesRow'
+import PendenciasPorDisciplina from '../components/dashboard/PendenciasPorDisciplina'
+import Card from '../components/Card'
 import Spinner from '../components/Spinner'
 
 function formatarDataHora(iso) {
@@ -67,6 +70,7 @@ function useDataReferencia() {
 
 export default function Home() {
   const [rows, setRows] = useState([])
+  const [obras, setObras] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [exportando, setExportando] = useState(false)
@@ -87,9 +91,11 @@ export default function Home() {
     setLoading(true)
     setError(null)
 
-    fetchRdoRelatorios()
-      .then((data) => {
-        if (ativo) setRows(data)
+    Promise.all([fetchRdoRelatorios(), fetchObrasEscopos()])
+      .then(([rdos, obrasEscopos]) => {
+        if (!ativo) return
+        setRows(rdos)
+        setObras(obrasEscopos)
       })
       .catch((err) => {
         if (ativo) setError(err.message)
@@ -107,6 +113,12 @@ export default function Home() {
     setSelecaoExplorador({ tipo, nome })
     exploradorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+
+  // Universo usado por TODOS os cálculos do dashboard: só RDOs cuja obra
+  // correspondente em obras_escopos está "Obra em Andamento" (RDOs sem
+  // obra cadastrada contam como em andamento por padrão — ver
+  // filtrarRdosEmAndamento).
+  const rowsAtivas = useMemo(() => filtrarRdosEmAndamento(rows, obras), [rows, obras])
 
   if (loading) {
     return (
@@ -127,17 +139,24 @@ export default function Home() {
     )
   }
 
-  const stats = computeStats(rows, dataReferencia)
-  const ultimaAtualizacao = computeUltimaAtualizacao(rows)
-  const serieDiaria = computeDailySeries(rows, dataReferencia, 15)
-  const topEmpresas = computeTopEmpresas(rows, dataReferencia, 5)
-  const topEspecialistas = computeTopEspecialistas(rows, dataReferencia, 5)
+  const stats = computeStats(rowsAtivas, dataReferencia)
+  const ultimaAtualizacao = computeUltimaAtualizacao(rowsAtivas)
+  const topEmpresas = computeTopEmpresas(rowsAtivas, dataReferencia, 5)
+  const topEspecialistas = computeTopEspecialistas(rowsAtivas, dataReferencia, 5)
+  const pendenciasPorDisciplina = computePendenciasPorDisciplina(rowsAtivas)
 
   async function handleExportarPdf() {
     setExportando(true)
     setErroExportacao(null)
     try {
-      await gerarRelatorioDiarioPdf({ rows, dataReferencia, stats, topEmpresas, topEspecialistas })
+      await gerarRelatorioDiarioPdf({
+        dataReferencia,
+        ultimaAtualizacao,
+        stats,
+        topEmpresas,
+        topEspecialistas,
+        pendenciasPorDisciplina,
+      })
     } catch (err) {
       setErroExportacao(err.message)
     } finally {
@@ -146,8 +165,12 @@ export default function Home() {
   }
 
   return (
-    <main className="flex-1 p-4 sm:p-6">
+    <main className="flex-1 p-4 sm:p-6 print:p-0">
       <div className="mx-auto max-w-6xl">
+        <h1 className="mb-1 hidden text-lg font-semibold text-navy print:block">
+          Relatório de Acompanhamento de RDOs
+        </h1>
+
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-gray-500">
             <p>
@@ -164,15 +187,16 @@ export default function Home() {
             type="button"
             onClick={handleExportarPdf}
             disabled={exportando}
-            className="inline-flex items-center gap-2 rounded-md bg-navy px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-navy/90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-md bg-navy px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-navy/90 disabled:opacity-50 print:hidden"
           >
             {exportando && <Spinner className="h-4 w-4" />}
             {exportando ? 'Gerando PDF...' : 'Exportar relatório do dia'}
           </button>
         </div>
 
-        <p className="mb-6 text-xs text-gray-400">
+        <p className="mb-6 text-xs text-gray-400 print:mb-3">
           Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO.
+          Só entram nas pendências RDOs de obras com status "Obra em Andamento".
         </p>
 
         {erroExportacao && (
@@ -181,7 +205,7 @@ export default function Home() {
           </p>
         )}
 
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 print:mb-3 print:grid-cols-4 print:gap-2">
           <StatCard label="Total a Aprovar" value={stats.total} tone="neutral" />
           <StatCard label="Aprovações Atrasadas" value={stats.atrasadas} tone="alert" />
           <StatCard
@@ -196,11 +220,34 @@ export default function Home() {
           />
         </div>
 
-        <div className="mb-6">
-          <DailyPendingChart data={serieDiaria} />
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2 print:mb-3 print:block">
+          <div className="print:hidden">
+            <VolumeHeatmap rows={rowsAtivas} dataReferencia={dataReferencia} />
+          </div>
+          <Card
+            faixaCor="#2f6fed"
+            categoria="Indicadores"
+            titulo="Visão geral"
+            className="flex flex-col print:mx-auto print:max-w-md"
+          >
+            <GaugesRow stats={stats} />
+          </Card>
         </div>
 
-        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div ref={exploradorRef} className="mb-6 print:hidden">
+          <DrilldownExplorer
+            rows={rowsAtivas}
+            dataReferencia={dataReferencia}
+            tipo={selecaoExplorador.tipo}
+            selecionado={selecaoExplorador.nome}
+            onTipoChange={(tipo) => setSelecaoExplorador((atual) => ({ ...atual, tipo }))}
+            onSelecionadoChange={(nome) =>
+              setSelecaoExplorador((atual) => ({ ...atual, nome }))
+            }
+          />
+        </div>
+
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2 print:mb-3">
           <TopBarChart
             titulo="Top 5 empresas com mais pendências atrasadas"
             data={topEmpresas}
@@ -219,25 +266,8 @@ export default function Home() {
           />
         </div>
 
-        <div className="mb-6">
-          <VolumeHeatmap rows={rows} dataReferencia={dataReferencia} />
-        </div>
-
-        <div className="mb-6">
-          <RankingEscoposAtrasados rows={rows} dataReferencia={dataReferencia} />
-        </div>
-
-        <div ref={exploradorRef}>
-          <DrilldownExplorer
-            rows={rows}
-            dataReferencia={dataReferencia}
-            tipo={selecaoExplorador.tipo}
-            selecionado={selecaoExplorador.nome}
-            onTipoChange={(tipo) => setSelecaoExplorador((atual) => ({ ...atual, tipo }))}
-            onSelecionadoChange={(nome) =>
-              setSelecaoExplorador((atual) => ({ ...atual, nome }))
-            }
-          />
+        <div className="mb-6 print:mb-3">
+          <PendenciasPorDisciplina rows={rowsAtivas} dataReferencia={dataReferencia} />
         </div>
       </div>
     </main>

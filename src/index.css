@@ -19,3 +19,21 @@
 body {
   margin: 0;
 }
+
+/* Impressão direta do dashboard (Ctrl+P / "Imprimir"), como alternativa
+   ao botão "Exportar relatório do dia" (que gera um PDF equivalente via
+   jsPDF — ver src/lib/pdfReport.js). As seções sem sentido impressas
+   (heatmap, explorador de pendências) usam a classe utilitária
+   `print:hidden` do Tailwind direto no JSX; aqui só o que não dá pra
+   expressar com uma classe utilitária: o tamanho de página e a remoção
+   de sombra (gasta tinta, não imprime bem). */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  .shadow-md {
+    box-shadow: none !important;
+  }
+}
