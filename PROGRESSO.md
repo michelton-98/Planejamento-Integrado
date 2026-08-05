@@ -138,13 +138,19 @@ PDF gerado no navegador com `jspdf` + `jspdf-autotable`. Deploy na Vercel.
   descobrir a URL), busca todos os admins aprovados em `perfis` e envia
   e-mail via API do Resend (`RESEND_API_KEY`, secret da function — **não
   está no código**, ver Pendências).
-- Trigger `trg_notificar_novo_cadastro` (migration `0008`) em
-  `public.perfis`, `after insert ... when (new.status_aprovacao =
-  'pendente')`, via `supabase_functions.http_request()` (mesmo mecanismo
-  interno de "Database Webhooks" do painel, só que versionado como
-  migration). O header `Authorization` usa a publishable/anon key do
-  projeto (pública, mesma do `.env`) só pra passar a checagem de JWT da
-  function — não dá acesso a nada sensível.
+- **Gatilho configurado via Database Webhooks do painel, não por
+  migration SQL**: a primeira tentativa (migration `0008` original,
+  `create trigger ... execute function supabase_functions.http_request`)
+  falhou com `schema "supabase_functions" does not exist` — esse schema
+  só é provisionado pelo próprio painel na primeira vez que a feature de
+  Webhooks é habilitada, uma migration comum não consegue criar isso. A
+  migration `0008` agora é só um no-op documentando a configuração real:
+  **Database → Webhooks → Create a new webhook** — table `perfis`, evento
+  só `Insert`, tipo `Supabase Edge Functions`, function
+  `notificar-novo-cadastro`. A condição "só quando `status_aprovacao =
+  'pendente'`" não dá pra configurar na UI de Webhooks (só filtra por
+  tabela+evento) — por isso está garantida dentro da própria Edge
+  Function, que rebusca o perfil e confere o status antes de enviar.
 - **Ainda não deployada** — Edge Functions não são aplicadas por SQL
   Editor. Ver Pendências para o passo a passo (CLI ou painel).
 
@@ -202,7 +208,7 @@ supabase/migrations/
   0005_rdo_relatorios_somente_admin.sql      Insert restrito a admins
   0006_obras_escopos.sql               Tabela obras_escopos ("Escopos - Rondonópolis") + RLS
   0007_rdo_relatorios_admin_delete.sql       Policy de DELETE em rdo_relatorios pra admins
-  0008_notificar_novo_cadastro_trigger.sql   Trigger -> Edge Function no novo cadastro
+  0008_notificar_novo_cadastro_trigger.sql   No-op — gatilho real é um Database Webhook (ver texto)
 
 supabase/functions/
   notificar-novo-cadastro/index.ts     E-mail aos admins via Resend (novo cadastro pendente)
@@ -212,15 +218,15 @@ vercel.json                            Rewrite de SPA para a Vercel
 
 ## Pendências / próximos passos
 
-- **Deployar a Edge Function `notificar-novo-cadastro`** e configurar a
-  secret `RESEND_API_KEY` (e opcionalmente `RESEND_FROM_EMAIL`) no
-  Supabase — ver instruções detalhadas na resposta que entregou essa
-  função (Dashboard → Edge Functions, ou `supabase functions deploy` via
-  CLI). Sem isso, o trigger `0008` chama uma function que não existe e a
-  chamada HTTP falha silenciosamente (não trava o cadastro do usuário,
-  só o e-mail não sai).
-- **Aplicar as migrations `0006` a `0008` no Supabase** (SQL Editor, na
-  ordem) — `0006`/`0007` já eram pendentes de sessões anteriores.
+- **Deployar a Edge Function `notificar-novo-cadastro`**, configurar a
+  secret `RESEND_API_KEY` (e opcionalmente `RESEND_FROM_EMAIL`), e criar o
+  Database Webhook (Database → Webhooks → table `perfis`, evento
+  `Insert`, tipo `Supabase Edge Functions`, function
+  `notificar-novo-cadastro`) — ver seção 6 acima. Sem isso, cadastro novo
+  continua funcionando normalmente, só o e-mail de aviso não sai.
+- **Aplicar as migrations `0006` e `0007` no Supabase** (SQL Editor, na
+  ordem) — pendentes de sessões anteriores. A `0008` é só documentação
+  (no-op), não precisa ser "aplicada" de verdade.
 - **Aplicar a migration `0006_obras_escopos.sql` no Supabase** (SQL
   Editor) — ainda não foi aplicada. Sem ela, a nova seção "Escopos -
   Rondonópolis" em `/input` e o filtro do dashboard por status de obra não

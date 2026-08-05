@@ -1,27 +1,31 @@
--- Dispara a Edge Function "notificar-novo-cadastro" (supabase/functions/
--- notificar-novo-cadastro/index.ts) toda vez que um novo perfil é criado
--- com status_aprovacao = 'pendente' (todo cadastro novo nasce assim, via
--- o gatilho handle_new_user() da migration 0002). A function busca os
--- admins aprovados em perfis e envia o aviso por e-mail via Resend.
+-- Esta migration foi abandonada: criar o trigger manualmente via SQL
+-- (supabase_functions.http_request) falha com "schema supabase_functions
+-- does not exist" em projetos que nunca usaram Database Webhooks antes —
+-- esse schema só é provisionado pelo próprio painel do Supabase na
+-- primeira vez que a feature é habilitada, não por uma migration comum.
 --
--- Usa o helper supabase_functions.http_request(), o mesmo mecanismo por
--- trás de "Database Webhooks" no painel do Supabase — só que declarado
--- aqui como migration para ficar versionado com o resto do schema.
+-- Configuração real (feita pelo painel, não por SQL):
+--   Database → Webhooks → "Enable Webhooks" (se for a primeira vez) →
+--   Create a new webhook:
+--     Name:          notificar_novo_cadastro
+--     Table:         public.perfis
+--     Events:        Insert (só)
+--     Webhook type:  Supabase Edge Functions
+--     Edge Function: notificar-novo-cadastro
 --
--- O header Authorization usa a "publishable key" (chave anônima) do
--- projeto — não é segredo, é a mesma chave que já vai embutida no bundle
--- do site (VITE_SUPABASE_ANON_KEY) — só serve para a Edge Function aceitar
--- a chamada (verificação de JWT). Ela NÃO dá acesso a nada sensível: a
--- function usa a service role key (injetada automaticamente nela, nunca
--- aparece aqui) para ler perfis/admins no banco.
-create trigger trg_notificar_novo_cadastro
-  after insert on public.perfis
-  for each row
-  when (new.status_aprovacao = 'pendente')
-  execute function supabase_functions.http_request(
-    'https://fxbbwwacphkdugukghkm.supabase.co/functions/v1/notificar-novo-cadastro',
-    'POST',
-    '{"Content-Type":"application/json","Authorization":"Bearer sb_publishable_RCqIB4QjvW3xxbqoAbjT_w_wPRydDi-"}',
-    '{}',
-    '5000'
-  );
+-- Isso cria, por trás dos panos, o mesmo tipo de trigger que esta
+-- migration tentava criar à mão — só que com a infraestrutura
+-- (schema supabase_functions, extensão pg_net) já provisionada
+-- corretamente pelo Supabase.
+--
+-- A condição "só quando status_aprovacao = 'pendente'" não dá pra
+-- configurar na UI de Webhooks (ela só filtra por tabela + evento), mas
+-- não faz falta: todo perfil novo já nasce 'pendente' (gatilho
+-- handle_new_user, migration 0002), e a Edge Function
+-- (supabase/functions/notificar-novo-cadastro/index.ts) rebusca o
+-- perfil e confere o status antes de enviar o e-mail — a checagem existe,
+-- só que no código da function em vez de no trigger.
+--
+-- Não recrie esse trigger via SQL depois de configurar o webhook pela
+-- UI — faria o e-mail ser enviado duas vezes por cadastro.
+select 1; -- no-op: mantém o número de sequência das migrations sem alterar o schema
