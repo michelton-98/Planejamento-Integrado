@@ -216,8 +216,13 @@ function desenharDisciplinas(doc, x, y, largura, pendencias) {
  * nota, embora com Top 10 isso raramente aconteça na prática.
  */
 function desenharTabelaRanking(doc, x, y, largura, titulo, itens, alturaDisponivel) {
+  // 9.5pt é o maior tamanho em que os dois títulos ("Top 10 empresas..."
+  // e "Top 10 especialistas...", esse último mais longo) cabem numa linha
+  // só dentro da largura da coluna — testado com doc.getTextWidth. Em
+  // 10.5pt o de especialistas quebrava em 2 linhas e sobrepunha a tabela
+  // logo abaixo. Mesmo tamanho nos dois títulos por consistência visual.
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10.5)
+  doc.setFontSize(9.5)
   doc.setTextColor(...hexParaRgb(COR_NAVY))
   doc.text(titulo, x, y, { maxWidth: largura })
 
