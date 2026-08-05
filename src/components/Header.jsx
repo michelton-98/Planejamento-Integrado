@@ -5,7 +5,7 @@ export default function Header() {
   const { user, profile, signOut } = useAuth()
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
+    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4 print:hidden">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
         <h1 className="text-lg font-semibold text-navy sm:text-xl">Controle RDO</h1>
         {profile?.status_aprovacao === 'aprovado' && (

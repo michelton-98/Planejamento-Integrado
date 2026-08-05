@@ -1,16 +1,10 @@
 // Layout compartilhado das telas de autenticação (login, esqueci minha
-// senha, redefinir senha): faixa de logos + fundo azul-marinho de tela
-// cheia com um cabeçalho institucional, e um card branco centralizado por
-// baixo.
+// senha, redefinir senha): fundo azul-marinho de tela cheia com um
+// cabeçalho institucional, e um card branco centralizado por baixo.
 export default function AuthLayout({ children }) {
   return (
     <main className="flex min-h-screen flex-col bg-gradient-to-b from-navy to-[#0a1830]">
-      <div className="flex items-center justify-between gap-4 bg-[#081422] px-6 py-6 sm:px-10 sm:py-8">
-        <img src="/logos/inpasa.png" alt="INPASA" className="h-16 w-auto sm:h-24" />
-        <img src="/logos/plaorc.png" alt="PLAORC" className="h-16 w-auto sm:h-24" />
-      </div>
-
-      <div className="flex flex-col items-center px-6 pb-8 pt-10 text-center sm:pt-16">
+      <div className="flex flex-col items-center px-6 pb-8 pt-16 text-center sm:pt-24">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
           Planejamento &amp; Controle de Obras
         </p>

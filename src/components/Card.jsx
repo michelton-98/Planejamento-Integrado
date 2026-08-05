@@ -12,23 +12,25 @@ export default function Card({
   titulo,
   children,
   className = '',
-  contentClassName = 'p-5',
+  contentClassName = 'p-5 print:p-3',
   ...rest
 }) {
   return (
     <Tag
-      className={`overflow-hidden rounded-2xl bg-white shadow-md shadow-gray-200/70 ${className}`}
+      className={`overflow-hidden rounded-2xl bg-white shadow-md shadow-gray-200/70 print:rounded-lg ${className}`}
       {...rest}
     >
-      <div className="h-1.5" style={{ backgroundColor: faixaCor }} />
+      <div className="h-1.5 print:h-1" style={{ backgroundColor: faixaCor }} />
       <div className={contentClassName}>
         {categoria && (
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 print:hidden">
             {categoria}
           </p>
         )}
         {titulo && (
-          <h3 className={`text-sm font-medium text-navy ${children ? 'mb-4' : ''}`}>{titulo}</h3>
+          <h3 className={`text-sm font-medium text-navy ${children ? 'mb-4 print:mb-2' : ''}`}>
+            {titulo}
+          </h3>
         )}
         {children}
       </div>

@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient'
+import { construirIndiceObras, encontrarObraCorrespondente } from './obraMatching'
 
 /**
  * Busca as colunas de rdo_relatorios usadas pelo dashboard. Toda a
@@ -14,6 +15,38 @@ export async function fetchRdoRelatorios() {
 
   if (error) throw error
   return data ?? []
+}
+
+const STATUS_OBRA_PADRAO = 'Obra em Andamento'
+
+/**
+ * Anexa `status_obra` e `disciplina` a cada RDO, cruzando com
+ * `obras_escopos` (por numero_contrato, senão empresa+escopo — ver
+ * obraMatching.js). RDOs sem obra correspondente cadastrada recebem
+ * `status_obra: 'Obra em Andamento'` por padrão (nunca são descartados
+ * silenciosamente) e `disciplina: null`.
+ */
+export function anexarStatusObra(rows, obras) {
+  const indice = construirIndiceObras(obras)
+
+  return rows.map((row) => {
+    const obra = encontrarObraCorrespondente(row, indice)
+    return {
+      ...row,
+      status_obra: obra?.status ?? STATUS_OBRA_PADRAO,
+      disciplina: obra?.disciplina ?? null,
+    }
+  })
+}
+
+/**
+ * Filtra os RDOs cuja obra correspondente está "Obra em Andamento" — o
+ * universo usado por TODOS os cálculos do dashboard (cards, gráficos,
+ * explorador, ranking por disciplina). Obras "Concluída", "não iniciada"
+ * ou "Paralisada" não contam como pendência.
+ */
+export function filtrarRdosEmAndamento(rows, obras) {
+  return anexarStatusObra(rows, obras).filter((row) => row.status_obra === STATUS_OBRA_PADRAO)
 }
 
 export function computeUltimaAtualizacao(rows) {
@@ -116,48 +149,6 @@ function estaAtrasado(row, dataReferencia) {
   return calcularStatusPrazo(row.data_relatorio, dataReferencia) === 'atrasado'
 }
 
-/**
- * Série diária dos últimos `dias` dias (incluindo `dataReferencia`), com a
- * contagem de cada combinação status × prazo por data_relatorio. Dias sem
- * registros aparecem com contagem zero, para mostrar a evolução real.
- */
-export function computeDailySeries(rows, dataReferencia = new Date(), dias = 15) {
-  const hoje = inicioDoDiaLocal(dataReferencia)
-
-  const porDia = new Map()
-  for (let i = dias - 1; i >= 0; i--) {
-    const data = new Date(hoje)
-    data.setDate(data.getDate() - i)
-    const { chave, label } = formatarDataLocal(data)
-    porDia.set(chave, {
-      data: chave,
-      label,
-      contratada_no_prazo: 0,
-      contratada_atrasada: 0,
-      especialista_no_prazo: 0,
-      especialista_atrasada: 0,
-    })
-  }
-
-  for (const row of rows) {
-    const chave = toDateKey(row.data_relatorio)
-    if (!chave || !porDia.has(chave)) continue
-
-    const bucket = porDia.get(chave)
-    const atrasado = estaAtrasado(row, hoje)
-
-    if (row.status_aprovacao === 'pendente_contratada') {
-      if (atrasado) bucket.contratada_atrasada += 1
-      else bucket.contratada_no_prazo += 1
-    } else if (row.status_aprovacao === 'pendente_especialista') {
-      if (atrasado) bucket.especialista_atrasada += 1
-      else bucket.especialista_no_prazo += 1
-    }
-  }
-
-  return Array.from(porDia.values())
-}
-
 function groupByCount(rows, campo) {
   const contagem = new Map()
   for (const row of rows) {
@@ -207,9 +198,7 @@ export function computeTopEspecialistas(rows, dataReferencia = new Date(), limit
  * Lista de nomes (empresas ou especialistas) com sua contagem de
  * pendências, restrita ao estágio do tipo escolhido — e a NENHUMA janela
  * de data. O explorador de pendências considera TODAS as datas já
- * importadas; só o gráfico de evolução diária (computeDailySeries) é
- * recortado aos últimos `dias`. Não filtre `rows` por data antes de
- * chamar esta função.
+ * importadas. Não filtre `rows` por data antes de chamar esta função.
  */
 export function computeNomesComContagem(rows, tipo) {
   return groupByCount(linhasDoTipo(rows, tipo), CAMPO_POR_TIPO[tipo])
@@ -299,79 +288,55 @@ export function filtrarPorData(rows, data) {
   return rows.filter((row) => toDateKey(row.data_relatorio) === data)
 }
 
-// --- Ranking de termos de escopo em atraso --------------------------------
+// --- Pendências por disciplina ---------------------------------------------
 
-const PARADAS_ESCOPO = new Set([
-  'de',
-  'da',
-  'do',
-  'das',
-  'dos',
-  'e',
-  'com',
-  'em',
-  'para',
-  'a',
-  'o',
-  'as',
-  'os',
-  'no',
-  'na',
-  'nos',
-  'nas',
-  'ao',
-  'aos',
-  'um',
-  'uma',
-  'por',
-])
-
-// Divide o texto do escopo em termos normalizados (sem acento, minúsculo,
-// só letras/números), descartando palavras muito curtas e as mais comuns
-// ("de", "da", "e"...) que não carregam significado — uma aproximação
-// simples e previsível de "tipo de escopo", sem exigir similaridade
-// textual mais sofisticada.
-function tokenizarEscopo(escopo) {
-  return String(escopo ?? '')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter((termo) => termo.length >= 3 && !PARADAS_ESCOPO.has(termo))
-}
+// Ordem fixa de exibição — disciplinas com contagem zero "afundam" pro
+// final da lista (ver computePendenciasPorDisciplina), mas entre as que
+// têm pendência a ordem abaixo é sempre respeitada.
+export const ORDEM_DISCIPLINAS = [
+  'Civil',
+  'Metal',
+  'Elétrica',
+  'Instrumentação',
+  'Rotativos',
+  'Qualidade',
+]
 
 /**
- * Top termos (palavras) mais frequentes no campo `escopo` entre as
- * pendências ATRASADAS (qualquer estágio). Cada termo conta no máximo uma
- * vez por linha, mesmo que se repita no texto do escopo.
+ * Quantidade de pendências (RDOs) por disciplina, já restrita ao universo
+ * de obras "em andamento" (rows deve vir de filtrarRdosEmAndamento). RDOs
+ * sem disciplina cadastrada na obra correspondente não entram em nenhum
+ * balde. Disciplinas com total zero saem da ordem fixa e vão para o fim
+ * da lista (mantendo a ordem fixa entre si).
  */
-export function computeRankingEscoposAtrasados(rows, dataReferencia = new Date(), limite = 10) {
-  const atrasadas = rows.filter((row) => estaAtrasado(row, dataReferencia))
-  const contagem = new Map()
+export function computePendenciasPorDisciplina(rows) {
+  const contagem = new Map(ORDEM_DISCIPLINAS.map((disciplina) => [disciplina, 0]))
 
-  for (const row of atrasadas) {
-    const termos = new Set(tokenizarEscopo(row.escopo))
-    for (const termo of termos) {
-      contagem.set(termo, (contagem.get(termo) ?? 0) + 1)
+  for (const row of rows) {
+    if (row.disciplina && contagem.has(row.disciplina)) {
+      contagem.set(row.disciplina, contagem.get(row.disciplina) + 1)
     }
   }
 
-  return Array.from(contagem.entries())
-    .map(([termo, total]) => ({ termo, total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, limite)
+  return ORDEM_DISCIPLINAS.map((disciplina, ordem) => ({
+    disciplina,
+    total: contagem.get(disciplina),
+    ordem,
+  })).sort((a, b) => {
+    const aZero = a.total === 0
+    const bZero = b.total === 0
+    if (aZero !== bZero) return aZero ? 1 : -1
+    return a.ordem - b.ordem
+  })
 }
 
 /**
- * Linhas ATRASADAS (mesmo universo do ranking acima) cujo escopo contém o
- * termo selecionado — para a tabela de detalhe ao clicar num item do
- * ranking.
+ * Linhas de detalhe (mesmo universo "em andamento") de uma disciplina
+ * selecionada — para a tabela ao clicar num item da lista.
  */
-export function filtrarPorTermoEscopo(rows, termo, dataReferencia = new Date()) {
+export function filtrarPorDisciplina(rows, disciplina, dataReferencia = new Date()) {
   return rows
-    .filter((row) => estaAtrasado(row, dataReferencia))
-    .filter((row) => tokenizarEscopo(row.escopo).includes(termo))
+    .filter((row) => row.disciplina === disciplina)
     .map((row) => ({
       numero_contrato: row.numero_contrato,
       data_relatorio: row.data_relatorio,
@@ -379,6 +344,7 @@ export function filtrarPorTermoEscopo(rows, termo, dataReferencia = new Date()) 
       empresa: row.empresa,
       responsavel_nome: row.responsavel_nome,
       status_aprovacao: row.status_aprovacao,
+      prazo: calcularStatusPrazo(row.data_relatorio, dataReferencia),
     }))
     .sort((a, b) => (a.data_relatorio < b.data_relatorio ? 1 : -1))
 }
