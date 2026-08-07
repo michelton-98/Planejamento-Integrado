@@ -27,7 +27,10 @@ function AppLayout({ children }) {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      {/* import.meta.env.BASE_URL reflete o "base" do vite.config.js — "/"
+          na Vercel, "/Controle-RDO/" no build do GitHub Pages. Sem isso,
+          as rotas ficariam erradas no subcaminho do Pages. */}
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/esqueci-senha" element={<EsqueciSenha />} />

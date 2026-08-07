@@ -9,7 +9,10 @@ alterações: escopos/disciplina, filtro do dashboard, gauges).
 React 19 + Vite 8 + Tailwind CSS v4, backend em Supabase (Auth + Postgres
 com RLS). Gráficos com `recharts`, parsing de CSV/XLSX com `papaparse` +
 `xlsx` (build corrigido do SheetJS, não a do npm — ver seção de segurança),
-PDF gerado no navegador com `jspdf` + `jspdf-autotable`. Deploy na Vercel.
+PDF gerado no navegador com `jspdf` (logos embutidas em base64, ver
+`src/lib/logoAssets.js`). **Dois destinos de deploy** a partir do mesmo
+código: Vercel (raiz do domínio) e GitHub Pages (subcaminho, alternativa
+para quando a Vercel é bloqueada por alguma rede) — ver seção 7.
 
 ## Funcionalidades implementadas
 
@@ -154,6 +157,33 @@ PDF gerado no navegador com `jspdf` + `jspdf-autotable`. Deploy na Vercel.
 - **Ainda não deployada** — Edge Functions não são aplicadas por SQL
   Editor. Ver Pendências para o passo a passo (CLI ou painel).
 
+### 7. Deploy duplo: Vercel + GitHub Pages
+- Motivo: a Vercel é bloqueada pela rede de alguns usuários (incluindo o
+  chefe) — GitHub Pages é uma alternativa publicada a partir do mesmo
+  repositório/build.
+- URL do Pages: **https://michelton-98.github.io/Controle-RDO/**
+  (subcaminho, diferente da raiz que a Vercel usa).
+- `vite.config.js`: `base` é `/Controle-RDO/` só quando a env var
+  `GITHUB_PAGES=true` está setada (é o workflow do Pages que seta isso no
+  build) — a Vercel não seta essa variável, então continua servindo da
+  raiz (`base: '/'`) sem mudança nenhuma.
+- `App.jsx`: `<BrowserRouter basename={import.meta.env.BASE_URL}>` —
+  `BASE_URL` já reflete o `base` acima automaticamente (recurso nativo do
+  Vite), então o roteamento fica correto nos dois destinos sem precisar
+  de lógica extra.
+- `AuthContext.jsx`: o link de redefinição de senha
+  (`resetPasswordForEmail`) também usa `import.meta.env.BASE_URL` no meio
+  do `redirectTo` — sem isso, o link do e-mail cairia sempre na raiz,
+  quebrado no Pages.
+- `.github/workflows/deploy-pages.yml`: builda com `GITHUB_PAGES=true` e
+  as secrets do repositório (`VITE_SUPABASE_URL`,
+  `VITE_SUPABASE_ANON_KEY`), copia `index.html` para `404.html` (truque
+  de SPA — sem isso, atualizar a página em qualquer rota que não seja a
+  raiz dá 404 de verdade no Pages) e publica via
+  `actions/deploy-pages`. Dispara a cada push na `main`.
+- **Configuração pendente no GitHub** (ver Pendências): habilitar Pages
+  com source "GitHub Actions" e cadastrar as secrets do repositório.
+
 ## Decisões técnicas relevantes
 
 - **`xlsx` via CDN do SheetJS, não do npm**: a versão no registro do npm
@@ -214,10 +244,20 @@ supabase/functions/
   notificar-novo-cadastro/index.ts     E-mail aos admins via Resend (novo cadastro pendente)
 
 vercel.json                            Rewrite de SPA para a Vercel
+
+.github/workflows/
+  deploy-pages.yml                     Build + deploy automático no GitHub Pages (push na main)
 ```
 
 ## Pendências / próximos passos
 
+- **Habilitar GitHub Pages com source "GitHub Actions"** — Settings →
+  Pages → Build and deployment → Source → **GitHub Actions** (não "Deploy
+  from a branch"). Sem isso o workflow roda mas o deploy final falha.
+- **Cadastrar as secrets do repositório** — Settings → Secrets and
+  variables → Actions → **New repository secret**, duas entradas com
+  esses nomes exatos (mesmos valores do `.env` local):
+  `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
 - **Deployar a Edge Function `notificar-novo-cadastro`**, configurar a
   secret `RESEND_API_KEY` (e opcionalmente `RESEND_FROM_EMAIL`), e criar o
   Database Webhook (Database → Webhooks → table `perfis`, evento

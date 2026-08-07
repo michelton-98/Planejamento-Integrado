@@ -1,0 +1,70 @@
+name: Deploy to GitHub Pages
+
+# Publica automaticamente em https://michelton-98.github.io/Controle-RDO/
+# a cada push na main. Alternativa à Vercel (útil quando a rede de algum
+# usuário bloqueia o domínio da Vercel).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Evita dois deploys concorrentes brigando pelo mesmo ambiente do Pages.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Build (base = /Controle-RDO/)
+        env:
+          GITHUB_PAGES: 'true'
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      # SPA no GitHub Pages: rota direta (ex.: /Controle-RDO/login) não
+      # existe como arquivo real, então o Pages devolveria 404. Copiando o
+      # index.html como 404.html, o Pages serve o próprio app nesse caso —
+      # o react-router (com basename correto) assume a partir daí.
+      - name: Fallback de SPA (404.html) e desabilitar Jekyll
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+
+      - name: Preparar artefato do Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload do artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
