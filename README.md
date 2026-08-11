@@ -1,4 +1,4 @@
-# Controle-RDO
+# Planejamento-Integrado
 Dashboard de acompanhamento de RDOs
 
 ## Stack

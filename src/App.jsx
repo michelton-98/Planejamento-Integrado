@@ -28,7 +28,7 @@ function App() {
   return (
     <AuthProvider>
       {/* import.meta.env.BASE_URL reflete o "base" do vite.config.js — "/"
-          na Vercel, "/Controle-RDO/" no build do GitHub Pages. Sem isso,
+          na Vercel, "/Planejamento-Integrado/" no build do GitHub Pages. Sem isso,
           as rotas ficariam erradas no subcaminho do Pages. */}
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>

@@ -1,8 +1,9 @@
 name: Deploy to GitHub Pages
 
-# Publica automaticamente em https://michelton-98.github.io/Controle-RDO/
-# a cada push na main. Alternativa à Vercel (útil quando a rede de algum
-# usuário bloqueia o domínio da Vercel).
+# Publica automaticamente em
+# https://michelton-98.github.io/Planejamento-Integrado/ a cada push na
+# main. Alternativa à Vercel (útil quando a rede de algum usuário bloqueia
+# o domínio da Vercel).
 on:
   push:
     branches: [main]
@@ -34,14 +35,14 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
-      - name: Build (base = /Controle-RDO/)
+      - name: Build (base = /Planejamento-Integrado/)
         env:
           GITHUB_PAGES: 'true'
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
-      # SPA no GitHub Pages: rota direta (ex.: /Controle-RDO/login) não
+      # SPA no GitHub Pages: rota direta (ex.: /Planejamento-Integrado/login) não
       # existe como arquivo real, então o Pages devolveria 404. Copiando o
       # index.html como 404.html, o Pages serve o próprio app nesse caso —
       # o react-router (com basename correto) assume a partir daí.

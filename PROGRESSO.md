@@ -161,9 +161,11 @@ para quando a Vercel é bloqueada por alguma rede) — ver seção 7.
 - Motivo: a Vercel é bloqueada pela rede de alguns usuários (incluindo o
   chefe) — GitHub Pages é uma alternativa publicada a partir do mesmo
   repositório/build.
-- URL do Pages: **https://michelton-98.github.io/Controle-RDO/**
-  (subcaminho, diferente da raiz que a Vercel usa).
-- `vite.config.js`: `base` é `/Controle-RDO/` só quando a env var
+- URL do Pages: **https://michelton-98.github.io/Planejamento-Integrado/**
+  (subcaminho, diferente da raiz que a Vercel usa; repositório renomeado
+  de `Controle-RDO` para `Planejamento-Integrado` — `git remote set-url`
+  já apontado pra URL nova).
+- `vite.config.js`: `base` é `/Planejamento-Integrado/` só quando a env var
   `GITHUB_PAGES=true` está setada (é o workflow do Pages que seta isso no
   build) — a Vercel não seta essa variável, então continua servindo da
   raiz (`base: '/'`) sem mudança nenhuma.
@@ -183,6 +185,39 @@ para quando a Vercel é bloqueada por alguma rede) — ver seção 7.
   `actions/deploy-pages`. Dispara a cada push na `main`.
 - **Configuração pendente no GitHub** (ver Pendências): habilitar Pages
   com source "GitHub Actions" e cadastrar as secrets do repositório.
+
+### 8. Auditoria de segurança (repositório vai virar público)
+- **Histórico de commits**: varrido por completo (todos os 12 commits,
+  todas as branches) por chaves/segredos vazados. Nada encontrado —
+  `.env` nunca foi commitado, nenhuma `SUPABASE_SERVICE_ROLE_KEY`/
+  `RESEND_API_KEY`/JWT antigo em nenhum diff. Detalhe completo na
+  resposta que entregou essa auditoria.
+- **RLS**: testado ao vivo contra produção como usuário anônimo — leitura
+  retorna 0 linhas e escrita é bloqueada nas 3 tabelas
+  (`rdo_relatorios`, `perfis`, `obras_escopos`), confirmando que RLS está
+  realmente ativo (não só presente nas migrations). As 3 exigências da
+  auditoria (rdo_relatorios só p/ aprovados, obras_escopos só editável
+  por admin, perfis não expõe dados de terceiros) já estavam satisfeitas
+  antes desta sessão — nenhuma policy precisou mudar.
+- **CAPTCHA (Cloudflare Turnstile) em `/cadastro`: tentado e revertido.**
+  A auditoria apontou `/cadastro` sem proteção anti-bot; chegamos a
+  implementar o widget Turnstile em Cadastro/Login/EsqueciSenha
+  (`AuthContext` repassando `captchaToken`) e o usuário configurou site
+  key + secret key. Ao ligar "Enable CAPTCHA protection" no Supabase,
+  ficou claro que isso exige `captchaToken` em **toda** chamada de auth do
+  cliente (login e reset de senha, não só cadastro) — adicionamos o
+  widget nas 3 telas, mas o usuário decidiu não usar captcha e pediu pra
+  reverter tudo. Removido por completo: componente
+  `src/components/auth/Turnstile.jsx`, o `<script>` do Turnstile em
+  `index.html`, `captchaToken` das 3 chamadas em `AuthContext.jsx`,
+  `VITE_TURNSTILE_SITE_KEY` do `.env.example` e do workflow do GitHub
+  Actions. **Se reconsiderar essa proteção no futuro, lembre de desligar
+  "Enable CAPTCHA protection" no painel do Supabase também** — só
+  remover do código não é suficiente (e foi exatamente isso que quebrou
+  o login na primeira tentativa: captcha exigido no servidor sem widget
+  na tela).
+  `/cadastro` continua sem proteção anti-bot — decisão consciente do
+  usuário, não uma pendência.
 
 ## Decisões técnicas relevantes
 
@@ -251,6 +286,15 @@ vercel.json                            Rewrite de SPA para a Vercel
 
 ## Pendências / próximos passos
 
+- **`/cadastro` sem proteção anti-bot** — decisão consciente (ver seção
+  8): CAPTCHA foi implementado e depois removido a pedido do usuário. Se
+  o spam virar problema real, considerar de novo (Turnstile ou outra
+  solução) — mas dessa vez avaliando de início que qualquer captcha do
+  Supabase Auth se aplica a login/reset também, não só ao cadastro.
+- **Confirmar que "Enable CAPTCHA protection" está desligado no Supabase**
+  (Authentication → Settings) — se ainda estiver ligado depois da reversão
+  do código, login/cadastro/reset de senha voltam a quebrar (é
+  literalmente o bug que motivou reverter da primeira vez).
 - **Habilitar GitHub Pages com source "GitHub Actions"** — Settings →
   Pages → Build and deployment → Source → **GitHub Actions** (não "Deploy
   from a branch"). Sem isso o workflow roda mas o deploy final falha.

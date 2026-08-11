@@ -68,8 +68,8 @@ export function AuthProvider({ children }) {
         options: { data: { nome, funcao } },
       }),
     // BASE_URL entra no meio pra funcionar tanto na Vercel ("/", link vira
-    // .../redefinir-senha) quanto no GitHub Pages ("/Controle-RDO/", link
-    // vira .../Controle-RDO/redefinir-senha) — sem isso o link do e-mail
+    // .../redefinir-senha) quanto no GitHub Pages ("/Planejamento-Integrado/",
+    // link vira .../Planejamento-Integrado/redefinir-senha) — sem isso o link do e-mail
     // cairia sempre na raiz, quebrado no Pages.
     resetPasswordForEmail: (email) =>
       supabase.auth.resetPasswordForEmail(email, {
