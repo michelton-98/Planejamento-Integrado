@@ -417,13 +417,20 @@ export async function gerarRelatorioDiarioPdf({
     topEmpresas,
     alturaDisponivel,
   )
+  // Nomes em caixa alta só nessa tabela do PDF (pedido específico) — é uma
+  // transformação só de exibição, feita aqui na hora de desenhar; não
+  // mexe em topEspecialistas nem em nenhum dado salvo no banco.
+  const topEspecialistasCaixaAlta = topEspecialistas.map((item) => ({
+    ...item,
+    nome: item.nome.toUpperCase(),
+  }))
   desenharTabelaRanking(
     doc,
     xColunaDireita,
     y,
     larguraColuna,
     'Top 10 especialistas com mais pendências atrasadas',
-    topEspecialistas,
+    topEspecialistasCaixaAlta,
     alturaDisponivel,
   )
 

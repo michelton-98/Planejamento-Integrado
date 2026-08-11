@@ -9,7 +9,7 @@ export default function AuthLayout({ children }) {
           Planejamento &amp; Controle de Obras
         </p>
         <h1 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
-          Controle de RDO · Sistema
+          Planejamento Integrado · Sistema
         </h1>
         <p className="mt-2 text-sm text-white/50">acesso restrito</p>
       </div>

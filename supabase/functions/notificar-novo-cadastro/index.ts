@@ -26,7 +26,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Controle RDO <onboarding@resend.dev>'
+const RESEND_FROM_EMAIL =
+  Deno.env.get('RESEND_FROM_EMAIL') ?? 'Planejamento Integrado <onboarding@resend.dev>'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
@@ -106,15 +107,15 @@ Deno.serve(async (req) => {
   const email = perfil.email || '(sem e-mail)'
   const funcao = perfil.funcao || '(não informado)'
 
-  const assunto = 'Novo cadastro aguardando aprovação — Controle RDO'
+  const assunto = 'Novo cadastro aguardando aprovação — Planejamento Integrado'
   const corpoHtml = `
-    <p>Um novo cadastro foi solicitado no <strong>Controle RDO</strong> e está aguardando aprovação:</p>
+    <p>Um novo cadastro foi solicitado no <strong>Planejamento Integrado</strong> e está aguardando aprovação:</p>
     <ul>
       <li><strong>Nome:</strong> ${escapeHtml(nome)}</li>
       <li><strong>E-mail:</strong> ${escapeHtml(email)}</li>
       <li><strong>Função:</strong> ${escapeHtml(funcao)}</li>
     </ul>
-    <p>Acesse a aba <strong>Aprovações</strong> no sistema para aprovar ou recusar esse cadastro.</p>
+    <p>Acesse a tela <strong>Gestão de Usuários</strong> no sistema para aprovar ou recusar esse cadastro.</p>
   `.trim()
 
   try {

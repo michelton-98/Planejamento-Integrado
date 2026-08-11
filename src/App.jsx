@@ -4,13 +4,14 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import Header from './components/Header'
 import Home from './pages/Home'
+import Rdo from './pages/Rdo'
 import Login from './pages/Login'
 import EsqueciSenha from './pages/EsqueciSenha'
 import RedefinirSenha from './pages/RedefinirSenha'
 import Cadastro from './pages/Cadastro'
 import AguardandoAprovacao from './pages/AguardandoAprovacao'
 import Input from './pages/Input'
-import Aprovacoes from './pages/admin/Aprovacoes'
+import AdminUsuarios from './pages/admin/AdminUsuarios'
 
 // Chrome padrão do app (cabeçalho + fundo) — usado nas telas internas.
 // As telas de autenticação (login, esqueci/redefinir senha) têm sua
@@ -52,21 +53,34 @@ function App() {
             }
           />
           <Route
-            path="/admin/aprovacoes"
+            path="/admin/usuarios"
             element={
               <AppLayout>
                 <AdminRoute>
-                  <Aprovacoes />
+                  <AdminUsuarios />
                 </AdminRoute>
               </AppLayout>
             }
           />
+          {/* Rota antiga (tela de Aprovações) — mantida como redirecionamento
+              para não quebrar links/favoritos existentes. */}
+          <Route path="/admin/aprovacoes" element={<Navigate to="/admin/usuarios" replace />} />
           <Route
             path="/"
             element={
               <AppLayout>
                 <ProtectedRoute>
                   <Home />
+                </ProtectedRoute>
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/rdo"
+            element={
+              <AppLayout>
+                <ProtectedRoute>
+                  <Rdo />
                 </ProtectedRoute>
               </AppLayout>
             }
