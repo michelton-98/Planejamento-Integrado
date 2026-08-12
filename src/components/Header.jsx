@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 
 // Chrome global, presente em toda tela interna: só a marca (link pro
@@ -10,6 +10,13 @@ import { useAuth } from '../lib/AuthContext'
 // acessados pelos cards do Painel).
 export default function Header() {
   const { user, signOut } = useAuth()
+  const location = useLocation()
+
+  // Na própria página inicial ("/"), e-mail + Sair já aparecem dentro da
+  // moldura do Painel de Ferramentas (junto com avatar/nome/papel) — não
+  // repete aqui pra não duplicar. Nas demais telas (sem essa moldura),
+  // continua sendo o único lugar com o botão Sair.
+  const naPaginaInicial = location.pathname === '/'
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4 print:hidden">
@@ -17,7 +24,7 @@ export default function Header() {
         Planejamento Integrado
       </Link>
 
-      {user && (
+      {user && !naPaginaInicial && (
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="hidden max-w-[10rem] truncate text-sm text-gray-600 sm:inline md:max-w-xs">
             {user.email}

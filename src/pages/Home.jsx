@@ -83,9 +83,7 @@ export default function Home() {
                 Planejamento Integrado{' '}
                 <span className="font-normal text-gray-400">· Painel de Ferramentas</span>
               </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Ferramentas de planejamento e controle de obras, integradas ao Supabase.
-              </p>
+              <p className="mt-1 text-sm text-gray-500">Ferramentas de controle interno INPASA</p>
             </div>
 
             <div className="flex items-center gap-3">

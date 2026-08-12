@@ -123,40 +123,43 @@ function DashboardMensal({ escopos, semanaisPorEscopo, mesReferencia }) {
   }
 
   return (
-    <Card faixaCor="#2f6fed" categoria="Cronograma do mês" titulo="Validação por quarta-feira" contentClassName="overflow-x-auto p-0">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
-            {quartas.map((data) => (
-              <th key={data} className="px-3 py-2 text-center font-medium text-gray-500">
-                {formatarDataBR(data)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
-          {linhas.map(({ escopo, celulas }) => (
-            <tr key={escopo.id}>
-              <td className="px-3 py-2 text-navy">
-                <span className="font-medium">{escopo.empresa}</span>
-                <span className="text-gray-400"> — {escopo.escopo}</span>
-              </td>
-              {celulas.map((celula) => (
-                <td key={celula.data} className="px-2 py-2 text-center">
-                  <span
-                    className={`inline-flex items-center justify-center rounded-full px-2 py-1 text-[11px] font-semibold leading-tight ${
-                      celula.validado ? 'bg-success/10 text-success' : 'bg-alert/10 text-alert'
-                    }`}
-                  >
-                    {celula.validado ? 'Cronograma Validado' : 'Cronograma Não Validado / Reprovado'}
-                  </span>
-                </td>
+    <Card faixaCor="#2f6fed" categoria="Cronograma do mês" titulo="Validação por quarta-feira">
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
+              {quartas.map((data) => (
+                <th key={data} className="px-3 py-2 text-center font-medium text-gray-500">
+                  {formatarDataBR(data)}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {linhas.map(({ escopo, celulas }) => (
+              <tr key={escopo.id}>
+                <td className="px-3 py-2 text-navy">
+                  <span className="font-medium">{escopo.empresa}</span>
+                  {escopo.numero_contrato && <span className="text-gray-400"> (CT {escopo.numero_contrato})</span>}
+                  <span className="text-gray-400"> — {escopo.escopo}</span>
+                </td>
+                {celulas.map((celula) => (
+                  <td key={celula.data} className="px-2 py-2 text-center">
+                    <span
+                      className={`inline-flex items-center justify-center rounded-full px-2 py-1 text-[11px] font-semibold leading-tight ${
+                        celula.validado ? 'bg-success/10 text-success' : 'bg-alert/10 text-alert'
+                      }`}
+                    >
+                      {celula.validado ? 'Cronograma Validado' : 'Cronograma Não Validado / Reprovado'}
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   )
 }
