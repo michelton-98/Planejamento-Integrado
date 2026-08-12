@@ -83,8 +83,12 @@ function CampoEscopoForm({ valores, onChange }) {
   )
 }
 
-function FormNovaValidacaoSemanal({ onCancelar, onSalvar, salvando }) {
-  const [form, setForm] = useState(FORM_SEMANAL_VAZIO)
+// Usado tanto pra criar uma validação semanal nova quanto pra editar uma
+// já existente (`valoresIniciais` vem preenchida com o registro atual
+// nesse caso) — mesmo formulário, só muda o texto do botão e o que
+// acontece no submit (ver EscopoCard).
+function FormValidacaoSemanal({ valoresIniciais = FORM_SEMANAL_VAZIO, textoSalvar = 'Salvar validação', onCancelar, onSalvar, salvando }) {
+  const [form, setForm] = useState(valoresIniciais)
 
   return (
     <form
@@ -164,7 +168,7 @@ function FormNovaValidacaoSemanal({ onCancelar, onSalvar, salvando }) {
           className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
         >
           {salvando && <Spinner className="h-3.5 w-3.5 text-white" />}
-          Salvar validação
+          {textoSalvar}
         </button>
         <button
           type="button"
@@ -187,7 +191,15 @@ function paraFormEscopo(escopo) {
   return { ...escopo, numero_contrato: escopo.numero_contrato ?? '' }
 }
 
-function EscopoCard({ escopo, semanais, onAtualizar, onRemover, onAdicionarSemanal, onRemoverSemanal }) {
+function EscopoCard({
+  escopo,
+  semanais,
+  onAtualizar,
+  onRemover,
+  onAdicionarSemanal,
+  onEditarSemanal,
+  onRemoverSemanal,
+}) {
   const [editando, setEditando] = useState(false)
   const [formEdicao, setFormEdicao] = useState(() => paraFormEscopo(escopo))
   const [salvandoEscopo, setSalvandoEscopo] = useState(false)
@@ -197,6 +209,10 @@ function EscopoCard({ escopo, semanais, onAtualizar, onRemover, onAdicionarSeman
   const [salvandoSemanal, setSalvandoSemanal] = useState(false)
   const [erroSemanal, setErroSemanal] = useState(null)
   const [removendoId, setRemovendoId] = useState(null)
+
+  // Registro em edição (id) — null quando nenhum está sendo editado.
+  const [editandoSemanalId, setEditandoSemanalId] = useState(null)
+  const [salvandoEdicaoSemanal, setSalvandoEdicaoSemanal] = useState(false)
 
   async function salvarEdicao() {
     if (!formEdicao.empresa.trim() || !formEdicao.escopo.trim()) {
@@ -244,6 +260,19 @@ function EscopoCard({ escopo, semanais, onAtualizar, onRemover, onAdicionarSeman
       setErroSemanal(err.message)
     } finally {
       setSalvandoSemanal(false)
+    }
+  }
+
+  async function salvarEdicaoSemanal(id, form) {
+    setSalvandoEdicaoSemanal(true)
+    setErroSemanal(null)
+    try {
+      await onEditarSemanal(escopo.id, id, form)
+      setEditandoSemanalId(null)
+    } catch (err) {
+      setErroSemanal(err.message)
+    } finally {
+      setSalvandoEdicaoSemanal(false)
     }
   }
 
@@ -335,43 +364,76 @@ function EscopoCard({ escopo, semanais, onAtualizar, onRemover, onAdicionarSeman
           <p className="text-sm text-gray-400">Nenhuma validação semanal registrada ainda.</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {semanais.map((registro) => (
-              <li
-                key={registro.id}
-                className="flex flex-col gap-1.5 rounded-lg border border-gray-100 bg-gray-50/60 p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs font-semibold text-navy">
-                      Avanço de {formatarDataBR(registro.data_recebimento)}
-                    </span>
-                    <span className="text-xs text-gray-400">registrado em {formatarDataHora(registro.criado_em)}</span>
-                    <Checkzinho marcado={registro.validado_planejamento} rotulo="Planejamento" />
-                    <Checkzinho marcado={registro.validado_especialista} rotulo="Especialista" />
-                    <Checkzinho marcado={registro.sharepoint} rotulo="Sharepoint" />
-                  </div>
-                  <p className="mt-1 text-sm text-navy">{registro.consideracao}</p>
-                  <p className="text-xs text-gray-400">
-                    Registrado por {registro.criado_por_nome || registro.criado_por_email || 'usuário removido'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => excluirSemanal(registro.id)}
-                  disabled={removendoId === registro.id}
-                  className="self-start text-xs font-medium text-alert hover:underline disabled:opacity-50 sm:self-center"
+            {semanais.map((registro) =>
+              registro.id === editandoSemanalId ? (
+                <li key={registro.id} className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3">
+                  <FormValidacaoSemanal
+                    valoresIniciais={{
+                      data_recebimento: registro.data_recebimento,
+                      validado_planejamento: registro.validado_planejamento,
+                      validado_especialista: registro.validado_especialista,
+                      sharepoint: registro.sharepoint,
+                      consideracao: registro.consideracao,
+                    }}
+                    textoSalvar="Salvar edição"
+                    salvando={salvandoEdicaoSemanal}
+                    onCancelar={() => {
+                      setEditandoSemanalId(null)
+                      setErroSemanal(null)
+                    }}
+                    onSalvar={(form) => salvarEdicaoSemanal(registro.id, form)}
+                  />
+                </li>
+              ) : (
+                <li
+                  key={registro.id}
+                  className="flex flex-col gap-1.5 rounded-lg border border-gray-100 bg-gray-50/60 p-3 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  {removendoId === registro.id ? 'Excluindo...' : 'Excluir'}
-                </button>
-              </li>
-            ))}
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs font-semibold text-navy">
+                        Avanço de {formatarDataBR(registro.data_recebimento)}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        registrado em {formatarDataHora(registro.criado_em)}
+                      </span>
+                      <Checkzinho marcado={registro.validado_planejamento} rotulo="Planejamento" />
+                      <Checkzinho marcado={registro.validado_especialista} rotulo="Especialista" />
+                      <Checkzinho marcado={registro.sharepoint} rotulo="Sharepoint" />
+                    </div>
+                    <p className="mt-1 text-sm text-navy">{registro.consideracao}</p>
+                    <p className="text-xs text-gray-400">
+                      Registrado por {registro.criado_por_nome || registro.criado_por_email || 'usuário removido'}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-3 self-start sm:self-center">
+                    <button
+                      type="button"
+                      onClick={() => setEditandoSemanalId(registro.id)}
+                      disabled={removendoId === registro.id}
+                      className="text-xs font-medium text-accent hover:underline disabled:opacity-50"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => excluirSemanal(registro.id)}
+                      disabled={removendoId === registro.id}
+                      className="text-xs font-medium text-alert hover:underline disabled:opacity-50"
+                    >
+                      {removendoId === registro.id ? 'Excluindo...' : 'Excluir'}
+                    </button>
+                  </div>
+                </li>
+              ),
+            )}
           </ul>
         )}
 
         {erroSemanal && <p className="mt-2 text-sm text-alert">{erroSemanal}</p>}
 
         {mostrarFormSemanal ? (
-          <FormNovaValidacaoSemanal
+          <FormValidacaoSemanal
             salvando={salvandoSemanal}
             onCancelar={() => {
               setMostrarFormSemanal(false)
@@ -383,7 +445,8 @@ function EscopoCard({ escopo, semanais, onAtualizar, onRemover, onAdicionarSeman
           <button
             type="button"
             onClick={() => setMostrarFormSemanal(true)}
-            className="mt-3 text-sm font-medium text-accent hover:underline"
+            disabled={Boolean(editandoSemanalId)}
+            className="mt-3 text-sm font-medium text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50"
           >
             + Nova validação semanal
           </button>
@@ -407,6 +470,7 @@ export default function ValidacoesDataBase({
   onAtualizarEscopo,
   onRemoverEscopo,
   onAdicionarSemanal,
+  onEditarSemanal,
   onRemoverSemanal,
 }) {
   const [filtroTexto, setFiltroTexto] = useState('')
@@ -488,6 +552,7 @@ export default function ValidacoesDataBase({
             onAtualizar={onAtualizarEscopo}
             onRemover={onRemoverEscopo}
             onAdicionarSemanal={onAdicionarSemanal}
+            onEditarSemanal={onEditarSemanal}
             onRemoverSemanal={onRemoverSemanal}
           />
         ))

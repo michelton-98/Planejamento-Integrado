@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import {
   computeValidacoesMatrizMensal,
   computeValidacoesStatsSemana,
+  listarEscoposPorConsideracaoSemana,
   mesAtualISO,
   quartaFeiraMaisRecente,
+  statusValidacaoRegistro,
 } from '../../lib/validacoesData'
 import Card from '../Card'
 import StatCard from '../dashboard/StatCard'
@@ -55,47 +57,73 @@ function ToggleModo({ modo, onChange }) {
 }
 
 function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
+  const [consideracaoSelecionada, setConsideracaoSelecionada] = useState(null)
+
   const stats = useMemo(
     () => computeValidacoesStatsSemana(escopos, semanaisPorEscopo, dataReferencia),
     [escopos, semanaisPorEscopo, dataReferencia],
   )
 
+  const detalhes = useMemo(
+    () =>
+      consideracaoSelecionada
+        ? listarEscoposPorConsideracaoSemana(escopos, semanaisPorEscopo, dataReferencia, consideracaoSelecionada)
+        : [],
+    [escopos, semanaisPorEscopo, dataReferencia, consideracaoSelecionada],
+  )
+
   const maxConsideracao = Math.max(...stats.porConsideracao.map((item) => item.total), stats.semRegistro, 1)
+
+  function handleClickConsideracao(valor) {
+    setConsideracaoSelecionada((atual) => (atual === valor ? null : valor))
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Escopos ativos" value={stats.totalEscoposAtivos} tone="neutral" />
         <StatCard label="Validação completa" value={stats.completos} tone="success" />
-        <StatCard label="Validação incompleta" value={stats.incompletos} tone="accent" />
+        <StatCard label="Validação em Andamento" value={stats.incompletos} tone="accent" />
         <StatCard label="Sem registro nesta data" value={stats.semRegistro} tone="alert" />
       </div>
 
       <Card faixaCor="#2f6fed" categoria="Situação na data de referência" titulo="Escopos por consideração">
         <ol className="flex flex-col gap-2">
-          {stats.porConsideracao.map((item) => (
-            <li key={item.valor}>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="text-navy">{item.valor}</span>
-                <span className="font-semibold text-navy">{item.total}</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${(item.total / maxConsideracao) * 100}%`,
-                    backgroundColor: COR_CONSIDERACAO[item.valor] ?? '#2f6fed',
-                  }}
-                />
-              </div>
-            </li>
-          ))}
+          {stats.porConsideracao.map((item) => {
+            const selecionado = consideracaoSelecionada === item.valor
+            return (
+              <li key={item.valor}>
+                <button
+                  type="button"
+                  onClick={() => handleClickConsideracao(item.valor)}
+                  aria-pressed={selecionado}
+                  className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
+                    selecionado ? 'border-accent bg-accent/10' : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="text-navy">{item.valor}</span>
+                    <span className="font-semibold text-navy">{item.total}</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(item.total / maxConsideracao) * 100}%`,
+                        backgroundColor: COR_CONSIDERACAO[item.valor] ?? '#2f6fed',
+                      }}
+                    />
+                  </div>
+                </button>
+              </li>
+            )
+          })}
           <li>
-            <div className="mb-1 flex items-center justify-between text-sm">
+            <div className="mb-1 flex items-center justify-between px-3 text-sm">
               <span className="text-gray-500">Sem registro nesta data</span>
               <span className="font-semibold text-navy">{stats.semRegistro}</span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+            <div className="mx-3 h-1.5 overflow-hidden rounded-full bg-gray-100">
               <div
                 className="h-full rounded-full bg-gray-400"
                 style={{ width: `${(stats.semRegistro / maxConsideracao) * 100}%` }}
@@ -103,6 +131,53 @@ function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
             </div>
           </li>
         </ol>
+
+        {consideracaoSelecionada && (
+          <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between bg-gray-50 px-3 py-2">
+              <p className="text-sm font-medium text-navy">
+                {consideracaoSelecionada} ({detalhes.length})
+              </p>
+              <button
+                type="button"
+                onClick={() => setConsideracaoSelecionada(null)}
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Fechar
+              </button>
+            </div>
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">Empresa</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {detalhes.map(({ escopo, registro }) => (
+                  <tr key={escopo.id}>
+                    <td className="px-3 py-2 text-navy">
+                      <span className="font-medium">{escopo.empresa}</span>
+                      {escopo.numero_contrato && (
+                        <span className="font-medium"> (CT {escopo.numero_contrato})</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">{escopo.escopo}</td>
+                    <td className="px-3 py-2 text-navy">{statusValidacaoRegistro(registro)}</td>
+                  </tr>
+                ))}
+                {detalhes.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-4 text-center text-gray-500">
+                      Nenhum escopo encontrado.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   )
@@ -141,7 +216,7 @@ function DashboardMensal({ escopos, semanaisPorEscopo, mesReferencia }) {
               <tr key={escopo.id}>
                 <td className="px-3 py-2 text-navy">
                   <span className="font-medium">{escopo.empresa}</span>
-                  {escopo.numero_contrato && <span className="text-gray-400"> (CT {escopo.numero_contrato})</span>}
+                  {escopo.numero_contrato && <span className="font-medium"> (CT {escopo.numero_contrato})</span>}
                   <span className="text-gray-400"> — {escopo.escopo}</span>
                 </td>
                 {celulas.map((celula) => (

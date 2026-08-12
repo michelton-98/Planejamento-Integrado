@@ -116,6 +116,38 @@ export async function removerValidacaoSemanal(id) {
   if (error) throw error
 }
 
+/**
+ * Atualiza um registro de validação semanal já existente — qualquer
+ * semana, não só a mais recente (decisão tomada na migration 0012: o
+ * histórico deixou de ser 100% imutável, o usuário vai atualizando o
+ * mesmo registro conforme a validação avança).
+ */
+export async function atualizarValidacaoSemanal(id, patch) {
+  const { data, error } = await supabase
+    .from('validacoes_semanais')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Status "de leitura rápida" de um registro, derivado dos 3 checkboxes —
+ * usado na lista expandida de "Escopos por consideração" do Dashboard.
+ * Prioridade da etapa mais avançada pra menos avançada; Sharepoint
+ * marcado sozinho (sem Planejamento nem Especialista) cai no último caso.
+ */
+export function statusValidacaoRegistro(registro) {
+  if (registro.validado_planejamento && registro.validado_especialista && registro.sharepoint) {
+    return 'Validação Concluída'
+  }
+  if (registro.validado_especialista) return 'Validado pelo Especialista'
+  if (registro.validado_planejamento) return 'Validado pelo Planejamento'
+  return 'Nenhuma etapa validada'
+}
+
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
@@ -243,6 +275,27 @@ export function computeValidacoesStatsSemana(escopos, semanaisPorEscopo, dataRef
     semRegistro,
     porConsideracao: Array.from(porConsideracao.entries()).map(([valor, total]) => ({ valor, total })),
   }
+}
+
+/**
+ * Escopos ATIVOS cujo registro na data_recebimento EXATA `dataReferencia`
+ * tem `consideracao === valorConsideracao` — usado pra expandir uma linha
+ * clicada em "Escopos por consideração" (modo Semanal do Dashboard) numa
+ * lista de detalhe. Mesma regra de "data exata" de computeValidacoesStatsSemana.
+ */
+export function listarEscoposPorConsideracaoSemana(escopos, semanaisPorEscopo, dataReferencia, valorConsideracao) {
+  const escoposAtivos = escopos.filter((escopo) => escopo.status === 'Ativa')
+  const resultado = []
+
+  for (const escopo of escoposAtivos) {
+    const registros = semanaisPorEscopo.get(escopo.id) ?? []
+    const registro = registros.find((item) => item.data_recebimento === dataReferencia)
+    if (registro && registro.consideracao === valorConsideracao) {
+      resultado.push({ escopo, registro })
+    }
+  }
+
+  return resultado
 }
 
 /**

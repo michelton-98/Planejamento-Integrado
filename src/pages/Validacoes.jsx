@@ -3,6 +3,7 @@ import { useAuth } from '../lib/AuthContext'
 import {
   agruparSemanaisPorEscopo,
   atualizarValidacaoEscopo,
+  atualizarValidacaoSemanal,
   fetchTodasValidacoesSemanais,
   fetchValidacoesEscopos,
   inserirValidacaoEscopo,
@@ -97,6 +98,24 @@ export default function Validacoes() {
     })
   }
 
+  async function handleEditarSemanal(escopoId, semanalId, form) {
+    const atualizado = await atualizarValidacaoSemanal(semanalId, {
+      data_recebimento: form.data_recebimento,
+      validado_planejamento: form.validado_planejamento,
+      validado_especialista: form.validado_especialista,
+      sharepoint: form.sharepoint,
+      consideracao: form.consideracao,
+    })
+    setSemanaisPorEscopo((atual) => {
+      const novoMapa = new Map(atual)
+      novoMapa.set(
+        escopoId,
+        (novoMapa.get(escopoId) ?? []).map((registro) => (registro.id === semanalId ? atualizado : registro)),
+      )
+      return novoMapa
+    })
+  }
+
   async function handleRemoverSemanal(escopoId, id) {
     await removerValidacaoSemanal(id)
     setSemanaisPorEscopo((atual) => {
@@ -146,6 +165,7 @@ export default function Validacoes() {
             onAtualizarEscopo={handleAtualizarEscopo}
             onRemoverEscopo={handleRemoverEscopo}
             onAdicionarSemanal={handleAdicionarSemanal}
+            onEditarSemanal={handleEditarSemanal}
             onRemoverSemanal={handleRemoverSemanal}
           />
         ) : (
