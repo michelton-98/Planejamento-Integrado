@@ -8,10 +8,14 @@ import { supabase } from './supabaseClient'
 export const STATUS_ESCOPO = ['Ativa', 'Concluída', 'Paralisada']
 export const STATUS_ESCOPO_PADRAO = 'Ativa'
 
-// As 5 opções fixas do campo "Consideração" — o texto antes do "—" é o
-// valor gravado no banco (enum via check constraint); a descrição é só
-// contexto exibido na interface, não é persistida.
+// As 6 opções fixas do campo "Consideração" — o valor é o texto gravado
+// no banco (enum via check constraint, ver migration 0011); a descrição é
+// só contexto exibido na interface, não é persistida.
 export const CONSIDERACOES = [
+  {
+    valor: 'Validação em Andamento',
+    descricao: 'Em análise pelo Planejamento e pelo Especialista',
+  },
   {
     valor: 'Não Validado Pelo Planejamento',
     descricao: 'Necessária alterações no CR/MC ou pendência na entrega de documentos',
@@ -29,7 +33,7 @@ export const CONSIDERACOES = [
     descricao: 'Em fase de elaboração de CR/MC',
   },
   {
-    valor: 'Falha nos entregáveis semanais',
+    valor: 'Documentos não recebidos',
     descricao: 'Contratada não enviou os documentos de avanço no prazo',
   },
 ]
@@ -144,15 +148,65 @@ export function contarFinalizadasSemanaMaisRecente(escopos, semanaisPorEscopo) {
   return total
 }
 
+// --- Datas (modo Semanal/Mensal do Dashboard) ---------------------------
+//
+// Sempre formatadas manualmente a partir dos componentes locais (nunca
+// `.toISOString()`, que converte pra UTC e pode voltar/adiantar um dia
+// perto da meia-noite) — assim o texto 'YYYY-MM-DD' bate exatamente com o
+// que o Postgres devolve pra uma coluna `date` (sem hora, sem fuso), e dá
+// pra comparar os dois com `===`.
+
+function paraISO(data) {
+  const ano = data.getFullYear()
+  const mes = String(data.getMonth() + 1).padStart(2, '0')
+  const dia = String(data.getDate()).padStart(2, '0')
+  return `${ano}-${mes}-${dia}`
+}
+
+const QUARTA_FEIRA = 3 // Date#getDay(): 0 = domingo ... 6 = sábado
+
 /**
- * Indicadores agregados pra aba Dashboard/Resumo: sempre olha só a
- * validação semanal MAIS RECENTE de cada escopo (nunca o histórico
- * inteiro) e só considera escopos com status "Ativa" — mesma lógica do
- * Controle de RDO, que só conta obras em andamento.
- * `semanaisPorEscopo` é o Map de agruparSemanaisPorEscopo (cada lista já
- * ordenada da mais recente pra mais antiga).
+ * Quarta-feira mais recente (hoje ou anterior), em 'YYYY-MM-DD'. Valor
+ * PADRÃO sugerido pro seletor "Data de referência" do Dashboard — quarta
+ * é o dia de envio semanal das empresas. Pra mudar esse padrão (ex.: outro
+ * dia da semana), troque só a constante QUARTA_FEIRA acima.
  */
-export function computeValidacoesStats(escopos, semanaisPorEscopo) {
+export function quartaFeiraMaisRecente(referencia = new Date()) {
+  const data = new Date(referencia)
+  while (data.getDay() !== QUARTA_FEIRA) {
+    data.setDate(data.getDate() - 1)
+  }
+  return paraISO(data)
+}
+
+/** Mês corrente em 'YYYY-MM' — valor padrão do seletor de mês no modo Mensal. */
+export function mesAtualISO(referencia = new Date()) {
+  return `${referencia.getFullYear()}-${String(referencia.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Todas as quartas-feiras ('YYYY-MM-DD') dentro do mês `mesISO` ('YYYY-MM'). */
+export function quartasFeirasDoMes(mesISO) {
+  const [ano, mes] = mesISO.split('-').map(Number)
+  const datas = []
+  const cursor = new Date(ano, mes - 1, 1)
+  while (cursor.getMonth() === mes - 1) {
+    if (cursor.getDay() === QUARTA_FEIRA) datas.push(paraISO(cursor))
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return datas
+}
+
+/**
+ * Indicadores agregados pra aba Dashboard — modo Semanal: considera SÓ os
+ * registros cuja data_recebimento seja EXATAMENTE `dataReferencia`
+ * ('YYYY-MM-DD') — nunca "o mais recente até essa data" — e só escopos
+ * com status "Ativa" (mesma lógica do Controle de RDO, que só conta obras
+ * em andamento). Escopo sem nenhum registro nessa data exata entra em
+ * `semRegistro` (não conta como validado nem como erro).
+ * `semanaisPorEscopo` é o Map de agruparSemanaisPorEscopo (cada lista já
+ * ordenada da mais recente pra mais antiga por criado_em).
+ */
+export function computeValidacoesStatsSemana(escopos, semanaisPorEscopo, dataReferencia) {
   const escoposAtivos = escopos.filter((escopo) => escopo.status === 'Ativa')
 
   const porConsideracao = new Map(CONSIDERACOES.map((item) => [item.valor, 0]))
@@ -161,17 +215,20 @@ export function computeValidacoesStats(escopos, semanaisPorEscopo) {
   let incompletos = 0
 
   for (const escopo of escoposAtivos) {
-    const maisRecente = semanaisPorEscopo.get(escopo.id)?.[0]
+    const registros = semanaisPorEscopo.get(escopo.id) ?? []
+    // Se houver mais de um registro pra mesma data_recebimento (reenvio
+    // no mesmo dia), fica o criado por último — a lista já vem ordenada
+    // por criado_em desc.
+    const registro = registros.find((item) => item.data_recebimento === dataReferencia)
 
-    if (!maisRecente) {
+    if (!registro) {
       semRegistro += 1
       continue
     }
 
-    porConsideracao.set(maisRecente.consideracao, (porConsideracao.get(maisRecente.consideracao) ?? 0) + 1)
+    porConsideracao.set(registro.consideracao, (porConsideracao.get(registro.consideracao) ?? 0) + 1)
 
-    const completo =
-      maisRecente.validado_planejamento && maisRecente.validado_especialista && maisRecente.sharepoint
+    const completo = registro.validado_planejamento && registro.validado_especialista && registro.sharepoint
     if (completo) {
       completos += 1
     } else {
@@ -186,4 +243,31 @@ export function computeValidacoesStats(escopos, semanaisPorEscopo) {
     semRegistro,
     porConsideracao: Array.from(porConsideracao.entries()).map(([valor, total]) => ({ valor, total })),
   }
+}
+
+/**
+ * Matriz pra aba Dashboard — modo Mensal: uma linha por escopo ATIVO, uma
+ * coluna por quarta-feira do mês `mesISO` ('YYYY-MM'). Cada célula é
+ * "validado" (Cronograma Validado) só se existir um registro pra aquele
+ * escopo com data_recebimento EXATAMENTE naquela quarta-feira E com os 3
+ * checkboxes marcados; qualquer outro caso (sem registro, ou registro com
+ * checkbox faltando) é "Cronograma Não Validado / Reprovado".
+ */
+export function computeValidacoesMatrizMensal(escopos, semanaisPorEscopo, mesISO) {
+  const escoposAtivos = escopos.filter((escopo) => escopo.status === 'Ativa')
+  const quartas = quartasFeirasDoMes(mesISO)
+
+  const linhas = escoposAtivos.map((escopo) => {
+    const registros = semanaisPorEscopo.get(escopo.id) ?? []
+    const celulas = quartas.map((data) => {
+      const registro = registros.find((item) => item.data_recebimento === data)
+      const validado = Boolean(
+        registro && registro.validado_planejamento && registro.validado_especialista && registro.sharepoint,
+      )
+      return { data, validado, registro: registro ?? null }
+    })
+    return { escopo, celulas }
+  })
+
+  return { quartas, linhas }
 }

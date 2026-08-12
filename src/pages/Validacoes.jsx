@@ -81,6 +81,7 @@ export default function Validacoes() {
   async function handleAdicionarSemanal(escopoId, form) {
     const novo = await inserirValidacaoSemanal({
       escopo_id: escopoId,
+      data_recebimento: form.data_recebimento,
       validado_planejamento: form.validado_planejamento,
       validado_especialista: form.validado_especialista,
       sharepoint: form.sharepoint,
