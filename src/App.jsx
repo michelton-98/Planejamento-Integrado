@@ -3,6 +3,7 @@ import { AuthProvider } from './lib/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import Header from './components/Header'
+import RdoToolNav from './components/RdoToolNav'
 import Home from './pages/Home'
 import Rdo from './pages/Rdo'
 import Login from './pages/Login'
@@ -11,6 +12,7 @@ import RedefinirSenha from './pages/RedefinirSenha'
 import Cadastro from './pages/Cadastro'
 import AguardandoAprovacao from './pages/AguardandoAprovacao'
 import Input from './pages/Input'
+import Validacoes from './pages/Validacoes'
 import AdminUsuarios from './pages/admin/AdminUsuarios'
 
 // Chrome padrão do app (cabeçalho + fundo) — usado nas telas internas.
@@ -80,7 +82,10 @@ function App() {
             element={
               <AppLayout>
                 <ProtectedRoute>
-                  <Rdo />
+                  <>
+                    <RdoToolNav />
+                    <Rdo />
+                  </>
                 </ProtectedRoute>
               </AppLayout>
             }
@@ -90,8 +95,21 @@ function App() {
             element={
               <AppLayout>
                 <AdminRoute>
-                  <Input />
+                  <>
+                    <RdoToolNav />
+                    <Input />
+                  </>
                 </AdminRoute>
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/validacoes"
+            element={
+              <AppLayout>
+                <ProtectedRoute>
+                  <Validacoes />
+                </ProtectedRoute>
               </AppLayout>
             }
           />

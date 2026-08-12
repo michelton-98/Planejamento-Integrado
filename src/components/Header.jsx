@@ -1,32 +1,21 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 
+// Chrome global, presente em toda tela interna: só a marca (link pro
+// Painel de Ferramentas) e a sessão do usuário. Os links de cada
+// ferramenta (Controle de RDO, Importar RDOs, Gestão de Usuários) NÃO
+// ficam mais aqui — cada um só aparece depois que o usuário entra na
+// ferramenta correspondente (ver RdoToolNav.jsx para a navegação interna
+// do Controle de RDO; Gestão de Usuários e Controle de Validações são
+// acessados pelos cards do Painel).
 export default function Header() {
-  const { user, profile, signOut } = useAuth()
+  const { user, signOut } = useAuth()
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4 print:hidden">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
-        <Link to="/" className="text-lg font-semibold text-navy hover:text-navy/80 sm:text-xl">
-          Planejamento Integrado
-        </Link>
-        {profile?.status_aprovacao === 'aprovado' && (
-          <Link to="/rdo" className="text-sm font-medium text-accent hover:underline">
-            Controle de RDO
-          </Link>
-        )}
-        {/* Importar RDOs e Gestão de Usuários são restritos a administradores. */}
-        {profile?.is_admin && (
-          <>
-            <Link to="/input" className="text-sm font-medium text-accent hover:underline">
-              Importar RDOs
-            </Link>
-            <Link to="/admin/usuarios" className="text-sm font-medium text-accent hover:underline">
-              Gestão de Usuários
-            </Link>
-          </>
-        )}
-      </div>
+      <Link to="/" className="text-lg font-semibold text-navy hover:text-navy/80 sm:text-xl">
+        Planejamento Integrado
+      </Link>
 
       {user && (
         <div className="flex items-center gap-2 sm:gap-3">
