@@ -191,6 +191,15 @@ function paraFormEscopo(escopo) {
   return { ...escopo, numero_contrato: escopo.numero_contrato ?? '' }
 }
 
+// Mais recente primeiro por data_recebimento (não pela ordem de criação) —
+// cobre o caso de cadastro retroativo (validação de uma semana anterior
+// registrada depois de uma mais recente já existir). 'YYYY-MM-DD' compara
+// certo como string. Em empate na data, mantém a ordem original (sort é
+// estável), que já vem por criado_em desc de fetchTodasValidacoesSemanais.
+function ordenarSemanaisPorDataRecebimento(semanais) {
+  return [...semanais].sort((a, b) => (a.data_recebimento < b.data_recebimento ? 1 : a.data_recebimento > b.data_recebimento ? -1 : 0))
+}
+
 function EscopoCard({
   escopo,
   semanais,
@@ -200,6 +209,8 @@ function EscopoCard({
   onEditarSemanal,
   onRemoverSemanal,
 }) {
+  const semanaisOrdenadas = useMemo(() => ordenarSemanaisPorDataRecebimento(semanais), [semanais])
+
   const [editando, setEditando] = useState(false)
   const [formEdicao, setFormEdicao] = useState(() => paraFormEscopo(escopo))
   const [salvandoEscopo, setSalvandoEscopo] = useState(false)
@@ -360,11 +371,11 @@ function EscopoCard({
       </div>
 
       <div className="mt-4 border-t border-gray-100 pt-3">
-        {semanais.length === 0 ? (
+        {semanaisOrdenadas.length === 0 ? (
           <p className="text-sm text-gray-400">Nenhuma validação semanal registrada ainda.</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {semanais.map((registro) =>
+            {semanaisOrdenadas.map((registro) =>
               registro.id === editandoSemanalId ? (
                 <li key={registro.id} className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3">
                   <FormValidacaoSemanal
@@ -480,11 +491,16 @@ export default function ValidacoesDataBase({
 
   const escoposExibidos = useMemo(() => {
     const termo = filtroTexto.trim().toLowerCase()
-    if (!termo) return escopos
-    return escopos.filter((escopo) => {
-      const campos = [escopo.numero_contrato, escopo.empresa, escopo.escopo, escopo.status]
-      return campos.some((valor) => (valor ?? '').toString().toLowerCase().includes(termo))
-    })
+    const filtrados = !termo
+      ? escopos
+      : escopos.filter((escopo) => {
+          const campos = [escopo.numero_contrato, escopo.empresa, escopo.escopo, escopo.status]
+          return campos.some((valor) => (valor ?? '').toString().toLowerCase().includes(termo))
+        })
+    // Sempre A-Z por empresa, recalculado a cada render (não é ordenação
+    // manual) — assim novos escopos entram no lugar certo automaticamente,
+    // não importa a ordem de cadastro.
+    return [...filtrados].sort((a, b) => a.empresa.localeCompare(b.empresa, 'pt-BR', { sensitivity: 'base' }))
   }, [escopos, filtroTexto])
 
   async function handleAdicionarEscopo(event) {
