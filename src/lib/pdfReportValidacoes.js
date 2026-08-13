@@ -12,6 +12,8 @@ import {
 
 const RODAPE_RESERVA = 34 // pt de folga acima do rodapé, mesma folga usada no relatório de RDO
 const TOPO_NOVA_PAGINA = 50
+const PADDING_CELULA_H = 6 // padding horizontal (esquerda/direita) dentro de cada célula
+const PADDING_CELULA_V = 3 // padding vertical (topo/base) dentro de cada célula
 
 // dataISO 'YYYY-MM-DD' -> 'DD/MM/AAAA', sem passar por `new Date()` (que
 // interpretaria como UTC e poderia voltar um dia) — mesma lógica de
@@ -25,23 +27,81 @@ function chaveArquivo(dataISO) {
   return dataISO
 }
 
+// Altura ocupada por cada linha de texto quebrado dentro de uma célula —
+// um pouco mais que o tamanho da fonte, pra dar espaçamento (leading)
+// confortável entre linhas consecutivas.
+function alturaPorLinhaDeTexto(fonteLinha) {
+  return fonteLinha * 1.15
+}
+
+/** Quebra o texto de uma célula na largura real da coluna (splitTextToSize). */
+function quebrarTextoColuna(doc, valor, coluna, fonteLinha) {
+  const larguraDisponivel = coluna.largura - PADDING_CELULA_H * 2
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(fonteLinha)
+  return doc.splitTextToSize(String(valor ?? '—'), larguraDisponivel)
+}
+
+// Desenha uma linha de texto já quebrada colocando em negrito o trecho
+// "(CT xxxxx)", se ele aparecer nela — usado nas colunas que combinam
+// nome da empresa/escopo com o número do contrato entre parênteses. jsPDF
+// não faz negrito parcial numa única chamada de `text`, então desenha em
+// 3 pedaços (antes/CT/depois) lado a lado, medindo a largura de cada um
+// pra encaixar o próximo exatamente onde o anterior terminou.
+function desenharLinhaComNegritoCT(doc, linha, x, yBase, fonteLinha, corHex) {
+  doc.setFontSize(fonteLinha)
+  doc.setTextColor(...hexParaRgb(corHex))
+
+  const match = linha.match(/^(.*?)(\(CT [^)]*\))(.*)$/)
+  if (!match) {
+    doc.setFont('helvetica', 'normal')
+    doc.text(linha, x, yBase)
+    return
+  }
+
+  const [, antes, ct, depois] = match
+  let cx = x
+  if (antes) {
+    doc.setFont('helvetica', 'normal')
+    doc.text(antes, cx, yBase)
+    cx += doc.getTextWidth(antes)
+  }
+  doc.setFont('helvetica', 'bold')
+  doc.text(ct, cx, yBase)
+  cx += doc.getTextWidth(ct)
+  if (depois) {
+    doc.setFont('helvetica', 'normal')
+    doc.text(depois, cx, yBase)
+  }
+}
+
 /**
  * Tabela genérica com cabeçalho colorido, zebra e paginação automática
  * (repete o cabeçalho em cada página nova, sempre respeitando a reserva de
- * espaço do rodapé). `colunas`: [{ titulo, largura, alinhar?, cor?(valor) }].
- * `linhas`: array de arrays de string, uma célula por coluna. Retorna o Y
- * logo abaixo da última linha desenhada.
+ * espaço do rodapé). `colunas`: [{ titulo, largura, alinhar?, cor?(valor),
+ * negritoCT? }]. `linhas`: array de arrays de string, uma célula por
+ * coluna. Retorna o Y logo abaixo da última linha desenhada.
+ *
+ * Cada célula tem seu texto quebrado (`splitTextToSize`) na largura real
+ * da própria coluna; a altura da linha da tabela é definida pelo maior
+ * número de linhas entre TODAS as colunas daquela linha (nunca uma altura
+ * fixa) — texto longo em qualquer coluna (Empresa, Escopo, Consideração...)
+ * empurra a linha inteira pra baixo, evitando corte/sobreposição com a
+ * linha seguinte. Texto sempre alinhado ao topo da célula, pra não ficar
+ * estranho quando colunas da mesma linha quebram em números diferentes de
+ * linhas de texto.
  */
 function desenharTabela(doc, { x, y, colunas, linhas, fonteLinha = 8.5, alturaLinha = 16 }) {
   const larguraTotal = colunas.reduce((soma, coluna) => soma + coluna.largura, 0)
   const pageHeight = doc.internal.pageSize.getHeight()
   const alturaCabecalho = 18
+  const alturaTextoLinha = alturaPorLinhaDeTexto(fonteLinha)
 
   function posicaoTexto(coluna, cx) {
     const align = coluna.alinhar ?? 'left'
-    if (align === 'right') return { tx: cx + coluna.largura - 6, align }
+    if (align === 'right') return { tx: cx + coluna.largura - PADDING_CELULA_H, align }
     if (align === 'center') return { tx: cx + coluna.largura / 2, align }
-    return { tx: cx + 6, align }
+    return { tx: cx + PADDING_CELULA_H, align }
   }
 
   function desenharCabecalhoTabela(yTopo) {
@@ -65,33 +125,49 @@ function desenharTabela(doc, { x, y, colunas, linhas, fonteLinha = 8.5, alturaLi
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(...hexParaRgb(CORES.cinzaTexto))
-    doc.text('Nenhum escopo ativo cadastrado.', x + 6, yAtual + 14)
+    doc.text('Nenhum escopo ativo cadastrado.', x + PADDING_CELULA_H, yAtual + 14)
     return yAtual + 24
   }
 
   linhas.forEach((linha, indice) => {
-    if (yAtual + alturaLinha > pageHeight - RODAPE_RESERVA) {
+    // 1) quebra o texto de cada coluna na largura real dela e usa o maior
+    // número de linhas resultante pra definir a altura desta linha.
+    const linhasPorColuna = colunas.map((coluna, colIndice) => quebrarTextoColuna(doc, linha[colIndice], coluna, fonteLinha))
+    const maxLinhasTexto = Math.max(1, ...linhasPorColuna.map((textoQuebrado) => textoQuebrado.length))
+    const alturaCalculada = maxLinhasTexto * alturaTextoLinha + PADDING_CELULA_V * 2
+    const alturaLinhaAtual = Math.max(alturaLinha, alturaCalculada)
+
+    if (yAtual + alturaLinhaAtual > pageHeight - RODAPE_RESERVA) {
       doc.addPage()
       yAtual = desenharCabecalhoTabela(TOPO_NOVA_PAGINA)
     }
 
     if (indice % 2 === 1) {
       doc.setFillColor(...hexParaRgb(CORES.cinzaClaro))
-      doc.rect(x, yAtual, larguraTotal, alturaLinha, 'F')
+      doc.rect(x, yAtual, larguraTotal, alturaLinhaAtual, 'F')
     }
 
     let cx = x
     colunas.forEach((coluna, colIndice) => {
-      const valor = linha[colIndice] ?? '—'
       const { tx, align } = posicaoTexto(coluna, cx)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(fonteLinha)
-      doc.setTextColor(...hexParaRgb(coluna.cor ? coluna.cor(valor) : CORES.navy))
-      doc.text(String(valor), tx, yAtual + alturaLinha - 5, { align, maxWidth: coluna.largura - 10 })
+      const cor = coluna.cor ? coluna.cor(linha[colIndice]) : CORES.navy
+
+      linhasPorColuna[colIndice].forEach((textoLinha, indiceLinhaTexto) => {
+        const yBase = yAtual + PADDING_CELULA_V + fonteLinha + indiceLinhaTexto * alturaTextoLinha
+        if (coluna.negritoCT && align === 'left') {
+          desenharLinhaComNegritoCT(doc, textoLinha, tx, yBase, fonteLinha, cor)
+        } else {
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(fonteLinha)
+          doc.setTextColor(...hexParaRgb(cor))
+          doc.text(textoLinha, tx, yBase, { align })
+        }
+      })
+
       cx += coluna.largura
     })
 
-    yAtual += alturaLinha
+    yAtual += alturaLinhaAtual
   })
 
   return yAtual
@@ -171,7 +247,7 @@ export async function gerarRelatorioValidacoesSemanalPdf({ dataReferencia, stats
   // --- Detalhamento por escopo --------------------------------------------
   y = desenharTituloSecao(doc, MARGEM_X, y, 'Detalhamento por escopo')
   const colunasDetalhe = [
-    { titulo: 'Empresa', largura: 115 },
+    { titulo: 'Empresa', largura: 115, negritoCT: true },
     { titulo: 'Escopo', largura: 115 },
     { titulo: 'Planejamento', largura: 68, alinhar: 'center', cor: corSimNao },
     { titulo: 'Especialista', largura: 68, alinhar: 'center', cor: corSimNao },
@@ -227,7 +303,7 @@ export async function gerarRelatorioValidacoesMensalPdf({ inicioPeriodo, fimPeri
   const larguraEscopo = 170
   const larguraColunaData = (larguraUtil - larguraEscopo) / Math.max(quartas.length, 1)
   const colunas = [
-    { titulo: 'Escopo', largura: larguraEscopo },
+    { titulo: 'Escopo', largura: larguraEscopo, negritoCT: true },
     ...quartas.map((data) => ({
       titulo: formatarDataISOBr(data).slice(0, 5), // DD/MM
       largura: larguraColunaData,
