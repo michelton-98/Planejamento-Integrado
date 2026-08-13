@@ -1,71 +1,31 @@
 import { jsPDF } from 'jspdf'
-import { LOGO_INPASA_BASE64, LOGO_PLAORC_BASE64 } from './logoAssets'
+import {
+  CORES,
+  MARGEM_X,
+  carregarLogos,
+  desenharCabecalho,
+  desenharCardsIndicadores,
+  desenharRodape,
+  formatarDataBR,
+  formatarDataHoraBR,
+  hexParaRgb,
+} from './pdfShared'
 
-// Paleta de marca (mesmos hex usados no restante do dashboard).
-const COR_NAVY = '#12263f'
-const COR_ACCENT = '#2f6fed'
-const COR_ALERT = '#d1495b'
-const COR_CINZA_CLARO = '#f3f4f6'
-const COR_CINZA_TRILHA = '#e5e7eb'
-const COR_CINZA_TEXTO = '#6b7280'
-
-const MARGEM_X = 40
-
-function hexParaRgb(hex) {
-  const valor = hex.replace('#', '')
-  return [
-    parseInt(valor.slice(0, 2), 16),
-    parseInt(valor.slice(2, 4), 16),
-    parseInt(valor.slice(4, 6), 16),
-  ]
-}
-
-// Lê a proporção largura/altura de uma logo já embutida como data URL
-// (logoAssets.js). As logos costumavam ser buscadas em tempo de execução
-// via '/logos/*.png' — funcionava em dev mas falhava intermitentemente em
-// produção no Vercel (a imagem não carregava, mesmo com o arquivo commitado
-// e o caminho correto). Embutir como base64 elimina essa requisição de
-// rede por completo: não há mais dependência do servidor estático.
-function carregarImagem(dataUrl) {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve({ dataUrl, aspecto: img.naturalWidth / img.naturalHeight })
-    img.onerror = () => reject(new Error('Não foi possível carregar a logo embutida no PDF.'))
-    img.src = dataUrl
-  })
-}
-
-function formatarDataBR(data) {
-  return data.toLocaleDateString('pt-BR')
-}
-
-function formatarDataHoraBR(data) {
-  return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' })
-}
+// Aliases locais — o corpo deste arquivo (gauges, disciplinas, ranking) foi
+// escrito antes da extração de pdfShared.js e usa esses nomes; mantidos
+// pra não precisar tocar em todo o resto do arquivo.
+const COR_NAVY = CORES.navy
+const COR_ACCENT = CORES.accent
+const COR_ALERT = CORES.alert
+const COR_CINZA_CLARO = CORES.cinzaClaro
+const COR_CINZA_TRILHA = CORES.cinzaTrilha
+const COR_CINZA_TEXTO = CORES.cinzaTexto
 
 function chaveDataLocal(data) {
   const ano = data.getFullYear()
   const mes = String(data.getMonth() + 1).padStart(2, '0')
   const dia = String(data.getDate()).padStart(2, '0')
   return `${ano}-${mes}-${dia}`
-}
-
-function desenharRodape(doc, dataReferencia) {
-  const pageWidth = doc.internal.pageSize.getWidth()
-  const pageHeight = doc.internal.pageSize.getHeight()
-  const agora = new Date()
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(...hexParaRgb(COR_CINZA_TEXTO))
-  doc.text(
-    `Relatório gerado em ${formatarDataHoraBR(agora)} · Referente a ${formatarDataBR(dataReferencia)}`,
-    MARGEM_X,
-    pageHeight - 20,
-  )
-  doc.text(String(doc.internal.getNumberOfPages()), pageWidth - MARGEM_X, pageHeight - 20, {
-    align: 'right',
-  })
 }
 
 // --- Gauge de meia-rosca desenhado em vetor puro (mesma técnica/matemática
@@ -298,10 +258,7 @@ export async function gerarRelatorioDiarioPdf({
   topEspecialistas,
   pendenciasPorDisciplina,
 }) {
-  const [logoInpasa, logoPlaorc] = await Promise.all([
-    carregarImagem(LOGO_INPASA_BASE64),
-    carregarImagem(LOGO_PLAORC_BASE64),
-  ])
+  const logos = await carregarLogos()
 
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -309,48 +266,15 @@ export async function gerarRelatorioDiarioPdf({
   const gap = 12
 
   // --- Cabeçalho -----------------------------------------------------
-  const alturaLogo = 38
-  doc.addImage(logoInpasa.dataUrl, 'PNG', MARGEM_X, 20, alturaLogo * logoInpasa.aspecto, alturaLogo)
-  const larguraLogoPlaorc = alturaLogo * logoPlaorc.aspecto
-  doc.addImage(
-    logoPlaorc.dataUrl,
-    'PNG',
-    pageWidth - MARGEM_X - larguraLogoPlaorc,
-    20,
-    larguraLogoPlaorc,
-    alturaLogo,
-  )
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  doc.setTextColor(...hexParaRgb(COR_NAVY))
-  doc.text('Relatório de Acompanhamento de RDOs', pageWidth / 2, 70, { align: 'center' })
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9.5)
-  doc.setTextColor(...hexParaRgb(COR_CINZA_TEXTO))
   const ultimaAtualizacaoTexto = ultimaAtualizacao
     ? formatarDataHoraBR(new Date(ultimaAtualizacao))
     : '—'
-  doc.text(
-    `Data de referência: ${formatarDataBR(dataReferencia)}   ·   Última atualização: ${ultimaAtualizacaoTexto}`,
-    pageWidth / 2,
-    87,
-    { align: 'center' },
-  )
-
-  doc.setFont('helvetica', 'italic')
-  doc.setFontSize(7.5)
-  doc.text(
-    'Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO.',
-    pageWidth / 2,
-    100,
-    { align: 'center' },
-  )
-
-  doc.setDrawColor(...hexParaRgb(COR_NAVY))
-  doc.setLineWidth(1.2)
-  doc.line(MARGEM_X, 110, pageWidth - MARGEM_X, 110)
+  const yCards = desenharCabecalho(doc, {
+    logos,
+    titulo: 'Relatório de Acompanhamento de RDOs',
+    subtitulo: `Data de referência: ${formatarDataBR(dataReferencia)}   ·   Última atualização: ${ultimaAtualizacaoTexto}`,
+    nota: 'Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO.',
+  })
 
   // --- KPIs ------------------------------------------------------------
   const indicadores = [
@@ -360,30 +284,7 @@ export async function gerarRelatorioDiarioPdf({
     { label: 'Pendentes Especialista', valor: stats.pendenteEspecialista, cor: COR_NAVY },
   ]
 
-  const larguraCard = (larguraUtil - gap * 3) / 4
-  const alturaCard = 62
-  const yCards = 126
-
-  indicadores.forEach((indicador, indice) => {
-    const x = MARGEM_X + indice * (larguraCard + gap)
-
-    doc.setFillColor(...hexParaRgb(COR_CINZA_CLARO))
-    doc.roundedRect(x, yCards, larguraCard, alturaCard, 4, 4, 'F')
-
-    doc.setDrawColor(...hexParaRgb(indicador.cor))
-    doc.setLineWidth(2.5)
-    doc.line(x + 4, yCards + 1, x + larguraCard - 4, yCards + 1)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.setTextColor(...hexParaRgb(COR_CINZA_TEXTO))
-    doc.text(indicador.label, x + 10, yCards + 22, { maxWidth: larguraCard - 20 })
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(22)
-    doc.setTextColor(...hexParaRgb(indicador.cor))
-    doc.text(String(indicador.valor), x + 10, yCards + 49)
-  })
+  const alturaCard = desenharCardsIndicadores(doc, MARGEM_X, yCards, larguraUtil, indicadores, { gap })
 
   let y = yCards + alturaCard + 30
 
@@ -434,7 +335,7 @@ export async function gerarRelatorioDiarioPdf({
     alturaDisponivel,
   )
 
-  desenharRodape(doc, dataReferencia)
+  desenharRodape(doc, `Referente a ${formatarDataBR(dataReferencia)}`, String(doc.internal.getNumberOfPages()))
 
   doc.save(`relatorio-rdo-${chaveDataLocal(dataReferencia)}.pdf`)
 }

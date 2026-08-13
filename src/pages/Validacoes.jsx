@@ -14,6 +14,7 @@ import {
 import Spinner from '../components/Spinner'
 import ValidacoesDataBase from '../components/validacoes/ValidacoesDataBase'
 import ValidacoesDashboard from '../components/validacoes/ValidacoesDashboard'
+import RelatorioValidacoesPainel from '../components/validacoes/RelatorioValidacoesPainel'
 
 const ABAS = [
   { chave: 'dados', rotulo: 'Data_Base' },
@@ -31,6 +32,7 @@ export default function Validacoes() {
   const { user, profile } = useAuth()
 
   const [aba, setAba] = useState('dados')
+  const [painelRelatorioAberto, setPainelRelatorioAberto] = useState(false)
   const [escopos, setEscopos] = useState([])
   const [semanaisPorEscopo, setSemanaisPorEscopo] = useState(new Map())
   const [loading, setLoading] = useState(true)
@@ -133,21 +135,31 @@ export default function Validacoes() {
           Cadastro de escopos e histórico semanal de validação entre Planejamento, Especialista e Sharepoint.
         </p>
 
-        <div className="mb-4 flex gap-2 border-b border-gray-200">
-          {ABAS.map((item) => (
-            <button
-              key={item.chave}
-              type="button"
-              onClick={() => setAba(item.chave)}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                aba === item.chave
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-navy'
-              }`}
-            >
-              {item.rotulo}
-            </button>
-          ))}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200">
+          <div className="flex gap-2">
+            {ABAS.map((item) => (
+              <button
+                key={item.chave}
+                type="button"
+                onClick={() => setAba(item.chave)}
+                className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                  aba === item.chave
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-navy'
+                }`}
+              >
+                {item.rotulo}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setPainelRelatorioAberto(true)}
+            className="mb-2 inline-flex items-center gap-2 rounded-md bg-navy px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-navy/90"
+          >
+            Emitir Relatório
+          </button>
         </div>
 
         {loading ? (
@@ -172,6 +184,15 @@ export default function Validacoes() {
           <ValidacoesDashboard escopos={escopos} semanaisPorEscopo={semanaisPorEscopo} />
         )}
       </div>
+
+      {!loading && !error && (
+        <RelatorioValidacoesPainel
+          escopos={escopos}
+          semanaisPorEscopo={semanaisPorEscopo}
+          aberto={painelRelatorioAberto}
+          onFechar={() => setPainelRelatorioAberto(false)}
+        />
+      )}
     </main>
   )
 }

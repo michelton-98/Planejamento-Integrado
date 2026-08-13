@@ -229,6 +229,46 @@ export function quartasFeirasDoMes(mesISO) {
 }
 
 /**
+ * `true` se `dataISO` ('YYYY-MM-DD') cai numa quarta-feira. Construído a
+ * partir dos componentes locais (nunca `new Date(dataISO)` puro, que
+ * interpreta a string como UTC e pode devolver o dia da semana errado perto
+ * da meia-noite em fusos negativos). Usado pra validar os campos "Início do
+ * período"/"Fim do período" do painel de emissão de relatório.
+ */
+export function ehQuartaFeira(dataISO) {
+  if (!dataISO) return false
+  const [ano, mes, dia] = dataISO.split('-').map(Number)
+  return new Date(ano, mes - 1, dia).getDay() === QUARTA_FEIRA
+}
+
+/**
+ * Fim máximo permitido pra um período mensal que começa em `inicioISO`
+ * (quarta-feira): 28 dias depois, ou seja, no máximo 5 quartas-feiras no
+ * período (a inicial conta como a 1ª). Usado como `max` do campo "Fim do
+ * período" e pra validar antes de emitir o relatório.
+ */
+export function fimMaximoPeriodoMensal(inicioISO) {
+  const [ano, mes, dia] = inicioISO.split('-').map(Number)
+  const data = new Date(ano, mes - 1, dia)
+  data.setDate(data.getDate() + 28)
+  return paraISO(data)
+}
+
+/** Todas as quartas-feiras ('YYYY-MM-DD') entre `inicioISO` e `fimISO`, inclusive. */
+export function quartasNoIntervalo(inicioISO, fimISO) {
+  const [anoI, mesI, diaI] = inicioISO.split('-').map(Number)
+  const [anoF, mesF, diaF] = fimISO.split('-').map(Number)
+  const cursor = new Date(anoI, mesI - 1, diaI)
+  const fim = new Date(anoF, mesF - 1, diaF)
+  const datas = []
+  while (cursor <= fim) {
+    if (cursor.getDay() === QUARTA_FEIRA) datas.push(paraISO(cursor))
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return datas
+}
+
+/**
  * Indicadores agregados pra aba Dashboard — modo Semanal: considera SÓ os
  * registros cuja data_recebimento seja EXATAMENTE `dataReferencia`
  * ('YYYY-MM-DD') — nunca "o mais recente até essa data" — e só escopos
@@ -299,16 +339,36 @@ export function listarEscoposPorConsideracaoSemana(escopos, semanaisPorEscopo, d
 }
 
 /**
- * Matriz pra aba Dashboard — modo Mensal: uma linha por escopo ATIVO, uma
- * coluna por quarta-feira do mês `mesISO` ('YYYY-MM'). Cada célula é
- * "validado" (Cronograma Validado) só se existir um registro pra aquele
- * escopo com data_recebimento EXATAMENTE naquela quarta-feira E com os 3
- * checkboxes marcados; qualquer outro caso (sem registro, ou registro com
- * checkbox faltando) é "Cronograma Não Validado / Reprovado".
+ * Detalhe de TODOS os escopos ATIVOS na data de referência exata (mesma
+ * regra de "data exata" de computeValidacoesStatsSemana) — um item por
+ * escopo, com `registro: null` pros que não têm nenhum lançamento nessa
+ * data. Ordenado A-Z por empresa (mesma ordenação da aba Data_Base). Usado
+ * pela tabela detalhada do relatório PDF semanal.
  */
-export function computeValidacoesMatrizMensal(escopos, semanaisPorEscopo, mesISO) {
+export function listarDetalheValidacaoSemana(escopos, semanaisPorEscopo, dataReferencia) {
   const escoposAtivos = escopos.filter((escopo) => escopo.status === 'Ativa')
-  const quartas = quartasFeirasDoMes(mesISO)
+
+  return escoposAtivos
+    .map((escopo) => {
+      const registros = semanaisPorEscopo.get(escopo.id) ?? []
+      const registro = registros.find((item) => item.data_recebimento === dataReferencia) ?? null
+      return { escopo, registro }
+    })
+    .sort((a, b) => a.escopo.empresa.localeCompare(b.escopo.empresa, 'pt-BR', { sensitivity: 'base' }))
+}
+
+/**
+ * Matriz genérica: uma linha por escopo ATIVO, uma coluna por cada data de
+ * `quartas` ('YYYY-MM-DD'). Cada célula é "validado" (Cronograma Validado)
+ * só se existir um registro pra aquele escopo com data_recebimento
+ * EXATAMENTE naquela data E com os 3 checkboxes marcados; qualquer outro
+ * caso (sem registro, ou registro com checkbox faltando) é "Cronograma Não
+ * Validado / Reprovado". Base tanto do modo Mensal do Dashboard (mês
+ * inteiro, ver computeValidacoesMatrizMensal) quanto do período livre do
+ * relatório PDF mensal (até 5 quartas-feiras, ver quartasNoIntervalo).
+ */
+export function computeValidacoesMatrizPeriodo(escopos, semanaisPorEscopo, quartas) {
+  const escoposAtivos = escopos.filter((escopo) => escopo.status === 'Ativa')
 
   const linhas = escoposAtivos.map((escopo) => {
     const registros = semanaisPorEscopo.get(escopo.id) ?? []
@@ -323,4 +383,27 @@ export function computeValidacoesMatrizMensal(escopos, semanaisPorEscopo, mesISO
   })
 
   return { quartas, linhas }
+}
+
+/** Matriz pra aba Dashboard — modo Mensal: todas as quartas-feiras do mês `mesISO` ('YYYY-MM'). */
+export function computeValidacoesMatrizMensal(escopos, semanaisPorEscopo, mesISO) {
+  return computeValidacoesMatrizPeriodo(escopos, semanaisPorEscopo, quartasFeirasDoMes(mesISO))
+}
+
+/**
+ * Indicadores agregados a partir de uma matriz já calculada (ver
+ * computeValidacoesMatrizPeriodo) — total de escopos ativos e contagem de
+ * células validadas/não validadas somando todas as semanas do período.
+ * Usado nos cards resumo do relatório PDF mensal.
+ */
+export function resumoMatrizPeriodo(linhas) {
+  let validadas = 0
+  let naoValidadas = 0
+  for (const { celulas } of linhas) {
+    for (const celula of celulas) {
+      if (celula.validado) validadas += 1
+      else naoValidadas += 1
+    }
+  }
+  return { totalEscoposAtivos: linhas.length, validadas, naoValidadas }
 }
