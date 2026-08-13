@@ -68,13 +68,13 @@ export default function GaugeChart({
           x={cx}
           y={cy - 6}
           textAnchor="middle"
-          className="fill-navy"
+          className="fill-navy dark:fill-slate-100"
           style={{ fontSize: 26, fontWeight: 700 }}
         >
           {valorLabel}
         </text>
       </svg>
-      {descricao && <div className="mt-1 text-center text-xs text-gray-500">{descricao}</div>}
+      {descricao && <div className="mt-1 text-center text-xs text-gray-500 dark:text-slate-400">{descricao}</div>}
     </div>
   )
 }

@@ -17,18 +17,18 @@ export default function Card({
 }) {
   return (
     <Tag
-      className={`overflow-hidden rounded-2xl bg-white shadow-md shadow-gray-200/70 print:rounded-lg ${className}`}
+      className={`overflow-hidden rounded-2xl bg-white shadow-md shadow-gray-200/70 print:rounded-lg dark:bg-slate-800 dark:shadow-black/30 ${className}`}
       {...rest}
     >
       <div className="h-1.5 print:h-1" style={{ backgroundColor: faixaCor }} />
       <div className={contentClassName}>
         {categoria && (
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 print:hidden">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 print:hidden dark:text-slate-500">
             {categoria}
           </p>
         )}
         {titulo && (
-          <h3 className={`text-sm font-medium text-navy ${children ? 'mb-4 print:mb-2' : ''}`}>
+          <h3 className={`text-sm font-medium text-navy dark:text-slate-100 ${children ? 'mb-4 print:mb-2' : ''}`}>
             {titulo}
           </h3>
         )}

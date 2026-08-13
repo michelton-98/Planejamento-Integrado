@@ -41,8 +41,8 @@ export default function Cadastro() {
     return (
       <main className="flex flex-1 items-center justify-center p-6">
         <Card faixaCor="#178a54" className="w-full max-w-sm" contentClassName="p-6 text-center">
-          <h2 className="mb-2 text-lg font-semibold text-navy">Cadastro enviado</h2>
-          <p className="mb-4 text-sm text-gray-600">
+          <h2 className="mb-2 text-lg font-semibold text-navy dark:text-slate-100">Cadastro enviado</h2>
+          <p className="mb-4 text-sm text-gray-600 dark:text-slate-300">
             Se a confirmação por e-mail estiver ativada, verifique sua caixa de entrada para
             confirmar a conta. Em seguida, seu acesso ficará pendente até que um administrador
             aprove seu cadastro.
@@ -64,9 +64,9 @@ export default function Cadastro() {
         className="w-full max-w-sm"
         contentClassName="p-6"
       >
-        <h2 className="mb-6 text-lg font-semibold text-navy">Criar conta</h2>
+        <h2 className="mb-6 text-lg font-semibold text-navy dark:text-slate-100">Criar conta</h2>
 
-        <label htmlFor="nome" className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor="nome" className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
           Nome
         </label>
         <input
@@ -76,10 +76,10 @@ export default function Cadastro() {
           autoComplete="name"
           value={nome}
           onChange={(event) => setNome(event.target.value)}
-          className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+          className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
         />
 
-        <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
           E-mail
         </label>
         <input
@@ -89,10 +89,10 @@ export default function Cadastro() {
           autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+          className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
         />
 
-        <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
           Senha
         </label>
         <input
@@ -103,10 +103,10 @@ export default function Cadastro() {
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+          className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
         />
 
-        <label htmlFor="funcao" className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor="funcao" className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
           Função
         </label>
         <input
@@ -116,7 +116,7 @@ export default function Cadastro() {
           placeholder="Ex.: Engenheiro de obra"
           value={funcao}
           onChange={(event) => setFuncao(event.target.value)}
-          className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+          className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
         />
 
         {error && <p className="mb-4 text-sm text-alert">{error}</p>}
@@ -124,13 +124,13 @@ export default function Cadastro() {
         <button
           type="submit"
           disabled={submitting}
-          className="mb-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50"
+          className="mb-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 dark:bg-accent dark:hover:bg-accent/90"
         >
           {submitting && <Spinner className="h-4 w-4" />}
           {submitting ? 'Enviando...' : 'Cadastrar'}
         </button>
 
-        <p className="text-center text-sm text-gray-600">
+        <p className="text-center text-sm text-gray-600 dark:text-slate-300">
           Já tem uma conta?{' '}
           <Link to="/login" className="font-medium text-accent hover:underline">
             Entrar

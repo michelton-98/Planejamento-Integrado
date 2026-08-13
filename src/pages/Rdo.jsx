@@ -124,7 +124,7 @@ export default function Rdo() {
   if (loading) {
     return (
       <main className="flex flex-1 items-center justify-center p-6">
-        <div className="flex items-center gap-2 text-gray-500">
+        <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400">
           <Spinner className="h-5 w-5 text-accent" />
           Carregando dashboard...
         </div>
@@ -177,14 +177,14 @@ export default function Rdo() {
         </h1>
 
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-gray-500">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-gray-500 dark:text-slate-400">
             <p>
               Última atualização:{' '}
-              <span className="font-medium text-navy">{formatarDataHora(ultimaAtualizacao)}</span>
+              <span className="font-medium text-navy dark:text-slate-100">{formatarDataHora(ultimaAtualizacao)}</span>
             </p>
             <p>
               Data de referência:{' '}
-              <span className="font-medium text-navy">{formatarData(dataReferencia)}</span>
+              <span className="font-medium text-navy dark:text-slate-100">{formatarData(dataReferencia)}</span>
             </p>
           </div>
 
@@ -192,14 +192,14 @@ export default function Rdo() {
             type="button"
             onClick={handleExportarPdf}
             disabled={exportando}
-            className="inline-flex items-center gap-2 rounded-md bg-navy px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-navy/90 disabled:opacity-50 print:hidden"
+            className="inline-flex items-center gap-2 rounded-md bg-navy px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-navy/90 disabled:opacity-50 print:hidden dark:bg-accent dark:hover:bg-accent/90"
           >
             {exportando && <Spinner className="h-4 w-4" />}
             {exportando ? 'Gerando PDF...' : 'Exportar relatório do dia'}
           </button>
         </div>
 
-        <p className="mb-6 text-xs text-gray-400 print:mb-3">
+        <p className="mb-6 text-xs text-gray-400 print:mb-3 dark:text-slate-500">
           Considerado atraso quando a aprovação ultrapassa 2 dias úteis a partir da data do RDO.{' '}
           <span className="print:hidden">
             Só entram nas pendências RDOs de obras com status "Obra em Andamento".

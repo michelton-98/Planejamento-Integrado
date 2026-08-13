@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
+import ThemeToggle from './ThemeToggle'
 
 // Chrome global, presente em toda tela interna: só a marca (link pro
 // Painel de Ferramentas) e a sessão do usuário. Os links de cada
@@ -19,25 +20,29 @@ export default function Header() {
   const naPaginaInicial = location.pathname === '/'
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4 print:hidden">
-      <Link to="/" className="text-lg font-semibold text-navy hover:text-navy/80 sm:text-xl">
+    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4 print:hidden dark:border-slate-700 dark:bg-slate-800">
+      <Link to="/" className="text-lg font-semibold text-navy hover:text-navy/80 sm:text-xl dark:text-slate-100 dark:hover:text-slate-300">
         Planejamento Integrado
       </Link>
 
-      {user && !naPaginaInicial && (
-        <div className="flex items-center gap-2 sm:gap-3">
-          <span className="hidden max-w-[10rem] truncate text-sm text-gray-600 sm:inline md:max-w-xs">
-            {user.email}
-          </span>
-          <button
-            type="button"
-            onClick={() => signOut()}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
-          >
-            Sair
-          </button>
-        </div>
-      )}
+      <div className="flex items-center gap-3 sm:gap-4">
+        <ThemeToggle />
+
+        {user && !naPaginaInicial && (
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="hidden max-w-[10rem] truncate text-sm text-gray-600 sm:inline md:max-w-xs dark:text-slate-400">
+              {user.email}
+            </span>
+            <button
+              type="button"
+              onClick={() => signOut()}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              Sair
+            </button>
+          </div>
+        )}
+      </div>
     </header>
   )
 }

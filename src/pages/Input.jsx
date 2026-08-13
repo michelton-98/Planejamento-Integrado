@@ -137,10 +137,10 @@ export default function Input() {
   return (
     <main className="flex-1 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
-        <h2 className="mb-6 text-lg font-semibold text-navy">Importar RDOs</h2>
+        <h2 className="mb-6 text-lg font-semibold text-navy dark:text-slate-100">Importar RDOs</h2>
 
         <Card faixaCor="#12263f" categoria="Importação" className="mb-6" contentClassName="p-4">
-          <label htmlFor="arquivo" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="arquivo" className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
             Arquivo .csv ou .xlsx (máx. 15 MB)
           </label>
           <input
@@ -150,15 +150,15 @@ export default function Input() {
             accept=".csv,.xlsx"
             onChange={handleFileChange}
             disabled={ocupado}
-            className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-300"
           />
           {fileName && (
-            <p className="mt-2 text-sm text-gray-500">Arquivo selecionado: {fileName}</p>
+            <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">Arquivo selecionado: {fileName}</p>
           )}
         </Card>
 
         {parsing && (
-          <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
+          <div className="mb-4 flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
             <Spinner className="h-4 w-4 text-accent" />
             Processando arquivo...
           </div>
@@ -171,7 +171,7 @@ export default function Input() {
         {rows.length > 0 && (
           <>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-slate-300">
                 {rows.length} linha(s) lida(s) — {validRows.length} válida(s),{' '}
                 {invalidRows.length} com erro
                 {invalidRows.length !== 1 ? 's' : ''}.
@@ -196,7 +196,7 @@ export default function Input() {
                   {validRows.length} registro(s) deste arquivo. Essa ação não pode ser desfeita.
                   Confirmar?
                 </p>
-                <p className="mb-3 text-xs text-gray-500">
+                <p className="mb-3 text-xs text-gray-500 dark:text-slate-400">
                   A tabela "Escopos - Rondonópolis" (obras cadastradas) não é afetada.
                 </p>
                 <div className="flex gap-3">
@@ -213,7 +213,7 @@ export default function Input() {
                     type="button"
                     onClick={() => setConfirmando(false)}
                     disabled={submitting}
-                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                   >
                     Cancelar
                   </button>
@@ -237,34 +237,34 @@ export default function Input() {
               className="mb-4"
               contentClassName="overflow-x-auto"
             >
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
+                <thead className="bg-gray-50 dark:bg-slate-700/50">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">Linha</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">Empresa</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">Contrato</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Linha</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Empresa</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Escopo</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Contrato</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">
                       Status aprovação
                     </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">Responsável</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">E-mail</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">Data</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">Nº RDO</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Responsável</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">E-mail</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Data</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Nº RDO</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-white dark:divide-slate-700 dark:bg-slate-800">
                   {rows.map((row) => (
-                    <tr key={row.linha} className={row.erros.length ? 'bg-red-50' : undefined}>
-                      <td className="px-3 py-2 text-gray-500">{row.linha}</td>
-                      <td className="px-3 py-2 text-navy">{row.empresa}</td>
-                      <td className="px-3 py-2 text-navy">{row.escopo}</td>
-                      <td className="px-3 py-2 text-navy">{row.numero_contrato ?? '—'}</td>
-                      <td className="px-3 py-2 text-navy">{row.status_aprovacao ?? '—'}</td>
-                      <td className="px-3 py-2 text-navy">{row.responsavel_nome}</td>
-                      <td className="px-3 py-2 text-navy">{row.responsavel_email}</td>
-                      <td className="px-3 py-2 text-navy">{row.data_relatorio ?? '—'}</td>
-                      <td className="px-3 py-2 text-navy">{row.numero_rdo ?? '—'}</td>
+                    <tr key={row.linha} className={row.erros.length ? 'bg-red-50 dark:bg-red-950/40' : undefined}>
+                      <td className="px-3 py-2 text-gray-500 dark:text-slate-400">{row.linha}</td>
+                      <td className="px-3 py-2 text-navy dark:text-slate-100">{row.empresa}</td>
+                      <td className="px-3 py-2 text-navy dark:text-slate-100">{row.escopo}</td>
+                      <td className="px-3 py-2 text-navy dark:text-slate-100">{row.numero_contrato ?? '—'}</td>
+                      <td className="px-3 py-2 text-navy dark:text-slate-100">{row.status_aprovacao ?? '—'}</td>
+                      <td className="px-3 py-2 text-navy dark:text-slate-100">{row.responsavel_nome}</td>
+                      <td className="px-3 py-2 text-navy dark:text-slate-100">{row.responsavel_email}</td>
+                      <td className="px-3 py-2 text-navy dark:text-slate-100">{row.data_relatorio ?? '—'}</td>
+                      <td className="px-3 py-2 text-navy dark:text-slate-100">{row.numero_rdo ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -272,7 +272,7 @@ export default function Input() {
             </Card>
 
             {invalidRows.length > 0 && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
                 <p className="mb-2 font-medium">Linhas com erro (não serão enviadas):</p>
                 <ul className="list-disc space-y-1 pl-5">
                   {invalidRows.map((row) => (
@@ -288,7 +288,7 @@ export default function Input() {
 
         <RdosSemObra refreshToken={refreshToken} onSolicitarCadastro={setPrefillObra} />
 
-        <div className="my-10 border-t border-gray-200" />
+        <div className="my-10 border-t border-gray-200 dark:border-slate-700" />
 
         <ObrasEscoposImport onImportado={() => setRefreshToken((atual) => atual + 1)} />
         <ObrasEscoposTable

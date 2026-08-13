@@ -11,7 +11,7 @@ const CORES_TOM = {
 }
 
 const TEXTO_TOM = {
-  neutral: 'text-navy',
+  neutral: 'text-navy dark:text-slate-100',
   accent: 'text-accent',
   alert: 'text-alert',
   success: 'text-success',
@@ -20,7 +20,7 @@ const TEXTO_TOM = {
 export default function StatCard({ label, value, tone = 'neutral' }) {
   return (
     <Card faixaCor={CORES_TOM[tone] ?? CORES_TOM.neutral}>
-      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-sm text-gray-500 dark:text-slate-400">{label}</p>
       <p className={`mt-1 text-3xl font-semibold ${TEXTO_TOM[tone] ?? TEXTO_TOM.neutral}`}>
         {value}
       </p>

@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Modo noturno é ativado por classe (`.dark` em algum ancestral), não por
+   `prefers-color-scheme` — assim o toggle do usuário (ver ThemeContext.jsx)
+   manda, independente da preferência do SO. A classe só é aplicada dentro
+   de <AppLayout> (App.jsx), então a tela de login nunca fica escura. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Paleta de marca (INPASA / PLAORC) — usada em todo o app.
    navy: base/texto/neutro · accent: destaque interativo/informativo ·
    alert: problema/atenção (uso semântico) · success: positivo/favorável

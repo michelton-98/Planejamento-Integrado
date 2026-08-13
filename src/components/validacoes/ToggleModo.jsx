@@ -6,14 +6,14 @@ export default function ToggleModo({ modo, onChange }) {
   const semanal = modo === 'semanal'
   return (
     <div className="flex items-center gap-2 text-sm font-medium">
-      <span className={semanal ? 'text-navy' : 'text-gray-400'}>Semanal</span>
+      <span className={semanal ? 'text-navy dark:text-slate-100' : 'text-gray-400 dark:text-slate-500'}>Semanal</span>
       <button
         type="button"
         role="switch"
         aria-checked={!semanal}
         onClick={() => onChange(semanal ? 'mensal' : 'semanal')}
         className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-          semanal ? 'bg-gray-300' : 'bg-accent'
+          semanal ? 'bg-gray-300 dark:bg-slate-600' : 'bg-accent'
         }`}
       >
         <span
@@ -22,7 +22,7 @@ export default function ToggleModo({ modo, onChange }) {
           }`}
         />
       </button>
-      <span className={!semanal ? 'text-navy' : 'text-gray-400'}>Mensal</span>
+      <span className={!semanal ? 'text-navy dark:text-slate-100' : 'text-gray-400 dark:text-slate-500'}>Mensal</span>
     </div>
   )
 }

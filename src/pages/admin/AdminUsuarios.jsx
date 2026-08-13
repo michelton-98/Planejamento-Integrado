@@ -163,20 +163,20 @@ export default function AdminUsuarios() {
   return (
     <main className="flex-1 p-4 sm:p-6">
       <div className="mx-auto max-w-4xl">
-        <h2 className="mb-1 text-lg font-semibold text-navy">Gestão de Usuários</h2>
-        <p className="mb-6 text-sm text-gray-500">
+        <h2 className="mb-1 text-lg font-semibold text-navy dark:text-slate-100">Gestão de Usuários</h2>
+        <p className="mb-6 text-sm text-gray-500 dark:text-slate-400">
           Aprove cadastros, gerencie quem tem acesso de administrador e remova contas.
         </p>
 
         {error && <p className="mb-4 text-sm text-alert">{error}</p>}
 
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
             <Spinner className="h-4 w-4" />
             Carregando...
           </div>
         ) : usuariosOrdenados.length === 0 ? (
-          <p className="text-sm text-gray-500">Nenhum usuário cadastrado.</p>
+          <p className="text-sm text-gray-500 dark:text-slate-400">Nenhum usuário cadastrado.</p>
         ) : (
           <ul className="flex flex-col gap-4">
             {usuariosOrdenados.map((usuario) => {
@@ -200,28 +200,30 @@ export default function AdminUsuarios() {
                 >
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-navy">{usuario.nome || '(sem nome)'}</p>
+                      <p className="font-medium text-navy dark:text-slate-100">{usuario.nome || '(sem nome)'}</p>
                       {vocêMesmo && <Badge className="bg-accent/10 text-accent">Você</Badge>}
                       <Badge className={COR_STATUS[usuario.status_aprovacao]}>
                         {ROTULO_STATUS[usuario.status_aprovacao] || usuario.status_aprovacao}
                       </Badge>
-                      {usuario.is_admin && <Badge className="bg-navy/10 text-navy">Admin</Badge>}
+                      {usuario.is_admin && (
+                        <Badge className="bg-navy/10 text-navy dark:bg-slate-100/10 dark:text-slate-200">Admin</Badge>
+                      )}
                       {usuario.is_master && <Badge className="bg-gold/10 text-gold">Master</Badge>}
                     </div>
-                    <p className="text-sm text-gray-600">{usuario.email}</p>
-                    <p className="text-sm text-gray-500">{usuario.funcao || '(sem função)'}</p>
+                    <p className="text-sm text-gray-600 dark:text-slate-300">{usuario.email}</p>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">{usuario.funcao || '(sem função)'}</p>
                   </div>
 
                   <div className="flex flex-col items-start gap-2 sm:items-end">
                     {pendente ? (
                       <>
-                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
                           <input
                             type="checkbox"
                             checked={Boolean(concederAdmin[usuario.id])}
                             onChange={() => alternarConcederAdmin(usuario.id)}
                             disabled={processando}
-                            className="rounded border-gray-300 text-accent focus:ring-accent"
+                            className="rounded border-gray-300 text-accent focus:ring-accent dark:border-slate-500 dark:bg-slate-700"
                           />
                           Conceder acesso de administrador
                         </label>
@@ -258,7 +260,7 @@ export default function AdminUsuarios() {
                               : undefined
                           }
                           onClick={() => alternarAdmin(usuario)}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                         >
                           {processando && <Spinner className="h-3.5 w-3.5" />}
                           {usuario.is_admin ? 'Rebaixar a usuário comum' : 'Promover a administrador'}

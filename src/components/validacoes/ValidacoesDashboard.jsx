@@ -72,14 +72,16 @@ function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
                   onClick={() => handleClickConsideracao(item.valor)}
                   aria-pressed={selecionado}
                   className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
-                    selecionado ? 'border-accent bg-accent/10' : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
+                    selecionado
+                      ? 'border-accent bg-accent/10'
+                      : 'border-transparent hover:border-gray-200 hover:bg-gray-50 dark:hover:border-slate-600 dark:hover:bg-slate-700/50'
                   }`}
                 >
                   <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-navy">{item.valor}</span>
-                    <span className="font-semibold text-navy">{item.total}</span>
+                    <span className="text-navy dark:text-slate-100">{item.valor}</span>
+                    <span className="font-semibold text-navy dark:text-slate-100">{item.total}</span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
                     <div
                       className="h-full rounded-full"
                       style={{
@@ -94,10 +96,10 @@ function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
           })}
           <li>
             <div className="mb-1 flex items-center justify-between px-3 text-sm">
-              <span className="text-gray-500">Sem registro nesta data</span>
-              <span className="font-semibold text-navy">{stats.semRegistro}</span>
+              <span className="text-gray-500 dark:text-slate-400">Sem registro nesta data</span>
+              <span className="font-semibold text-navy dark:text-slate-100">{stats.semRegistro}</span>
             </div>
-            <div className="mx-3 h-1.5 overflow-hidden rounded-full bg-gray-100">
+            <div className="mx-3 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
               <div
                 className="h-full rounded-full bg-gray-400"
                 style={{ width: `${(stats.semRegistro / maxConsideracao) * 100}%` }}
@@ -107,9 +109,9 @@ function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
         </ol>
 
         {consideracaoSelecionada && (
-          <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200">
-            <div className="flex items-center justify-between bg-gray-50 px-3 py-2">
-              <p className="text-sm font-medium text-navy">
+          <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
+            <div className="flex items-center justify-between bg-gray-50 px-3 py-2 dark:bg-slate-700/50">
+              <p className="text-sm font-medium text-navy dark:text-slate-100">
                 {consideracaoSelecionada} ({detalhes.length})
               </p>
               <button
@@ -120,30 +122,30 @@ function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
                 Fechar
               </button>
             </div>
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
+              <thead className="bg-gray-50 dark:bg-slate-700/50">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Empresa</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Status</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Empresa</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Escopo</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-200 bg-white dark:divide-slate-700 dark:bg-slate-800">
                 {detalhes.map(({ escopo, registro }) => (
                   <tr key={escopo.id}>
-                    <td className="px-3 py-2 text-navy">
+                    <td className="px-3 py-2 text-navy dark:text-slate-100">
                       <span className="font-medium">{escopo.empresa}</span>
                       {escopo.numero_contrato && (
                         <span className="font-medium"> (CT {escopo.numero_contrato})</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-gray-500">{escopo.escopo}</td>
-                    <td className="px-3 py-2 text-navy">{statusValidacaoRegistro(registro)}</td>
+                    <td className="px-3 py-2 text-gray-500 dark:text-slate-400">{escopo.escopo}</td>
+                    <td className="px-3 py-2 text-navy dark:text-slate-100">{statusValidacaoRegistro(registro)}</td>
                   </tr>
                 ))}
                 {detalhes.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-3 py-4 text-center text-gray-500">
+                    <td colSpan={3} className="px-3 py-4 text-center text-gray-500 dark:text-slate-400">
                       Nenhum escopo encontrado.
                     </td>
                   </tr>
@@ -164,34 +166,38 @@ function DashboardMensal({ escopos, semanaisPorEscopo, mesReferencia }) {
   )
 
   if (quartas.length === 0) {
-    return <p className="text-sm text-gray-500">Mês sem nenhuma quarta-feira (verifique o valor selecionado).</p>
+    return (
+      <p className="text-sm text-gray-500 dark:text-slate-400">
+        Mês sem nenhuma quarta-feira (verifique o valor selecionado).
+      </p>
+    )
   }
 
   if (linhas.length === 0) {
-    return <p className="text-sm text-gray-500">Nenhum escopo ativo cadastrado.</p>
+    return <p className="text-sm text-gray-500 dark:text-slate-400">Nenhum escopo ativo cadastrado.</p>
   }
 
   return (
     <Card faixaCor="#2f6fed" categoria="Cronograma do mês" titulo="Validação por quarta-feira">
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
+        <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
+          <thead className="bg-gray-50 dark:bg-slate-700/50">
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
+              <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Escopo</th>
               {quartas.map((data) => (
-                <th key={data} className="px-3 py-2 text-center font-medium text-gray-500">
+                <th key={data} className="px-3 py-2 text-center font-medium text-gray-500 dark:text-slate-400">
                   {formatarDataBR(data)}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-gray-200 bg-white dark:divide-slate-700 dark:bg-slate-800">
             {linhas.map(({ escopo, celulas }) => (
               <tr key={escopo.id}>
-                <td className="px-3 py-2 text-navy">
+                <td className="px-3 py-2 text-navy dark:text-slate-100">
                   <span className="font-medium">{escopo.empresa}</span>
                   {escopo.numero_contrato && <span className="font-medium"> (CT {escopo.numero_contrato})</span>}
-                  <span className="text-gray-400"> — {escopo.escopo}</span>
+                  <span className="text-gray-400 dark:text-slate-500"> — {escopo.escopo}</span>
                 </td>
                 {celulas.map((celula) => (
                   <td key={celula.data} className="px-2 py-2 text-center">
@@ -229,27 +235,27 @@ export default function ValidacoesDashboard({ escopos, semanaisPorEscopo }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
         <ToggleModo modo={modo} onChange={setModo} />
 
         {modo === 'semanal' ? (
-          <label className="flex items-center gap-2 text-sm text-gray-600">
+          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
             Data de referência
             <input
               type="date"
               value={dataReferencia}
               onChange={(event) => setDataReferencia(event.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
             />
           </label>
         ) : (
-          <label className="flex items-center gap-2 text-sm text-gray-600">
+          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
             Mês de referência
             <input
               type="month"
               value={mesReferencia}
               onChange={(event) => setMesReferencia(event.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
             />
           </label>
         )}

@@ -257,14 +257,14 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
   function ThOrdenavel({ campo, children }) {
     const ativo = ordenacao.campo === campo
     return (
-      <th className="px-3 py-2 text-left font-medium text-gray-500">
+      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">
         <button
           type="button"
           onClick={() => handleOrdenar(campo)}
-          className="inline-flex items-center gap-1 hover:text-navy"
+          className="inline-flex items-center gap-1 hover:text-navy dark:hover:text-slate-100"
         >
           {children}
-          <span className="text-[10px] text-gray-400">
+          <span className="text-[10px] text-gray-400 dark:text-slate-500">
             {ativo ? (ordenacao.direcao === 'asc' ? '▲' : '▼') : '⇅'}
           </span>
         </button>
@@ -281,7 +281,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
         onChange={(event) => handleTextoChange(obra.id, campo, event.target.value)}
         onBlur={() => handleTextoBlur(obra, campo)}
         disabled={salvandoId === obra.id}
-        className="w-full min-w-[7rem] rounded-md border border-transparent px-2 py-1 text-sm text-navy hover:border-gray-300 focus:border-accent focus:outline-none disabled:opacity-50"
+        className="w-full min-w-[7rem] rounded-md border border-transparent px-2 py-1 text-sm text-navy hover:border-gray-300 focus:border-accent focus:outline-none disabled:opacity-50 dark:text-slate-100 dark:hover:border-slate-600"
       />
     )
   }
@@ -289,7 +289,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
   return (
     <Card faixaCor="#2f6fed" categoria="Cadastro" titulo="Obras cadastradas" className="mb-6">
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
           <Spinner className="h-4 w-4 text-accent" />
           Carregando obras...
         </div>
@@ -303,12 +303,12 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
               value={filtroTexto}
               onChange={(event) => setFiltroTexto(event.target.value)}
               placeholder="Buscar por contrato, empresa ou escopo..."
-              className="min-w-[16rem] flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="min-w-[16rem] flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             />
             <select
               value={filtroDisciplina}
               onChange={(event) => setFiltroDisciplina(event.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             >
               <option value="">Todas as disciplinas</option>
               {DISCIPLINAS.map((disciplina) => (
@@ -320,7 +320,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
             <select
               value={filtroStatus}
               onChange={(event) => setFiltroStatus(event.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             >
               <option value="">Todos os status</option>
               {STATUS_OFICIAIS.map((status) => (
@@ -344,19 +344,19 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
             )}
           </div>
 
-          <div className="mb-4 overflow-x-auto rounded-lg border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
+          <div className="mb-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
+            <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
+              <thead className="bg-gray-50 dark:bg-slate-700/50">
                 <tr>
                   <ThOrdenavel campo="numero_contrato">Contrato</ThOrdenavel>
                   <ThOrdenavel campo="empresa">Empresa</ThOrdenavel>
                   <ThOrdenavel campo="escopo">Escopo</ThOrdenavel>
                   <ThOrdenavel campo="disciplina">Disciplina</ThOrdenavel>
                   <ThOrdenavel campo="status">Status</ThOrdenavel>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Ações</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-200 bg-white dark:divide-slate-700 dark:bg-slate-800">
                 {obrasExibidas.map((obra) => (
                   <tr key={obra.id}>
                     <td className="px-1 py-1">
@@ -375,7 +375,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
                           handleCampoChange(obra, 'disciplina', event.target.value || null)
                         }
                         disabled={salvandoId === obra.id}
-                        className="rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:opacity-50"
+                        className="rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
                       >
                         <option value="">—</option>
                         {DISCIPLINAS.map((disciplina) => (
@@ -390,7 +390,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
                         value={obra.status}
                         onChange={(event) => handleCampoChange(obra, 'status', event.target.value)}
                         disabled={salvandoId === obra.id}
-                        className="rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:opacity-50"
+                        className="rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
                       >
                         {STATUS_OFICIAIS.map((status) => (
                           <option key={status} value={status}>
@@ -419,7 +419,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
                 ))}
                 {obrasExibidas.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-4 text-center text-gray-500">
+                    <td colSpan={6} className="px-3 py-4 text-center text-gray-500 dark:text-slate-400">
                       {obras.length === 0
                         ? 'Nenhuma obra cadastrada ainda.'
                         : 'Nenhuma obra encontrada com esse filtro.'}
@@ -433,33 +433,33 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
           <form
             ref={formRef}
             onSubmit={handleAdicionar}
-            className="grid grid-cols-1 gap-3 rounded-lg border border-dashed border-gray-300 p-4 sm:grid-cols-2 lg:grid-cols-6"
+            className="grid grid-cols-1 gap-3 rounded-lg border border-dashed border-gray-300 p-4 sm:grid-cols-2 lg:grid-cols-6 dark:border-slate-600"
           >
             <input
               type="text"
               placeholder="Contrato (opcional)"
               value={form.numero_contrato}
               onChange={(event) => setForm((f) => ({ ...f, numero_contrato: event.target.value }))}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             />
             <input
               type="text"
               placeholder="Empresa"
               value={form.empresa}
               onChange={(event) => setForm((f) => ({ ...f, empresa: event.target.value }))}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             />
             <input
               type="text"
               placeholder="Escopo"
               value={form.escopo}
               onChange={(event) => setForm((f) => ({ ...f, escopo: event.target.value }))}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             />
             <select
               value={form.disciplina}
               onChange={(event) => setForm((f) => ({ ...f, disciplina: event.target.value }))}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             >
               <option value="">Disciplina —</option>
               {DISCIPLINAS.map((disciplina) => (
@@ -471,7 +471,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
             <select
               value={form.status}
               onChange={(event) => setForm((f) => ({ ...f, status: event.target.value }))}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             >
               {STATUS_OFICIAIS.map((status) => (
                 <option key={status} value={status}>

@@ -130,12 +130,12 @@ export default function Validacoes() {
   return (
     <main className="flex-1 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
-        <h1 className="mb-1 text-lg font-semibold text-navy">Controle de Validações</h1>
-        <p className="mb-4 text-sm text-gray-500">
+        <h1 className="mb-1 text-lg font-semibold text-navy dark:text-slate-100">Controle de Validações</h1>
+        <p className="mb-4 text-sm text-gray-500 dark:text-slate-400">
           Cadastro de escopos e histórico semanal de validação entre Planejamento, Especialista e Sharepoint.
         </p>
 
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 dark:border-slate-700">
           <div className="flex gap-2">
             {ABAS.map((item) => (
               <button
@@ -145,7 +145,7 @@ export default function Validacoes() {
                 className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
                   aba === item.chave
                     ? 'border-accent text-accent'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-navy'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-navy dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-100'
                 }`}
               >
                 {item.rotulo}
@@ -156,14 +156,14 @@ export default function Validacoes() {
           <button
             type="button"
             onClick={() => setPainelRelatorioAberto(true)}
-            className="mb-2 inline-flex items-center gap-2 rounded-md bg-navy px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-navy/90"
+            className="mb-2 inline-flex items-center gap-2 rounded-md bg-navy px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-navy/90 dark:bg-accent dark:hover:bg-accent/90"
           >
             Emitir Relatório
           </button>
         </div>
 
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
             <Spinner className="h-4 w-4" />
             Carregando...
           </div>

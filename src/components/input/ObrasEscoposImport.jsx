@@ -64,10 +64,10 @@ export default function ObrasEscoposImport({ onImportado }) {
 
   return (
     <div>
-      <h3 className="mb-4 text-base font-semibold text-navy">Escopos - Rondonópolis</h3>
+      <h3 className="mb-4 text-base font-semibold text-navy dark:text-slate-100">Escopos - Rondonópolis</h3>
 
       <Card faixaCor="#12263f" categoria="Importação" className="mb-6" contentClassName="p-4">
-        <label htmlFor="arquivo-obras" className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor="arquivo-obras" className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
           Planilha .xlsx com as colunas "Obra" e "Status" (máx. 15 MB)
         </label>
         <input
@@ -77,13 +77,13 @@ export default function ObrasEscoposImport({ onImportado }) {
           accept=".xlsx"
           onChange={handleFileChange}
           disabled={ocupado}
-          className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-300"
         />
-        {fileName && <p className="mt-2 text-sm text-gray-500">Arquivo selecionado: {fileName}</p>}
+        {fileName && <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">Arquivo selecionado: {fileName}</p>}
       </Card>
 
       {parsing && (
-        <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
+        <div className="mb-4 flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
           <Spinner className="h-4 w-4 text-accent" />
           Processando arquivo...
         </div>
@@ -94,7 +94,7 @@ export default function ObrasEscoposImport({ onImportado }) {
       {rows.length > 0 && (
         <>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-slate-300">
               {rows.length} linha(s) lida(s) — {validRows.length} válida(s),{' '}
               {invalidRows.length} com erro{invalidRows.length !== 1 ? 's' : ''}
               {linhasParaRevisar.length > 0 &&
@@ -130,38 +130,38 @@ export default function ObrasEscoposImport({ onImportado }) {
             className="mb-4"
             contentClassName="overflow-x-auto"
           >
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
+              <thead className="bg-gray-50 dark:bg-slate-700/50">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Linha</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Empresa</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Contrato</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Linha</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Empresa</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Escopo</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Contrato</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">
                     Status detectado
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-200 bg-white dark:divide-slate-700 dark:bg-slate-800">
                 {rows.map((row) => (
                   <tr
                     key={row.linha}
                     className={
                       row.erro
-                        ? 'bg-red-50'
+                        ? 'bg-red-50 dark:bg-red-950/40'
                         : !row.statusReconhecido
-                          ? 'bg-amber-50'
+                          ? 'bg-amber-50 dark:bg-amber-950/30'
                           : undefined
                     }
                   >
-                    <td className="px-3 py-2 text-gray-500">{row.linha}</td>
-                    <td className="px-3 py-2 text-navy">{row.empresa}</td>
-                    <td className="px-3 py-2 text-navy">{row.escopo}</td>
-                    <td className="px-3 py-2 text-navy">{row.numero_contrato ?? '—'}</td>
-                    <td className="px-3 py-2 text-navy">
+                    <td className="px-3 py-2 text-gray-500 dark:text-slate-400">{row.linha}</td>
+                    <td className="px-3 py-2 text-navy dark:text-slate-100">{row.empresa}</td>
+                    <td className="px-3 py-2 text-navy dark:text-slate-100">{row.escopo}</td>
+                    <td className="px-3 py-2 text-navy dark:text-slate-100">{row.numero_contrato ?? '—'}</td>
+                    <td className="px-3 py-2 text-navy dark:text-slate-100">
                       {row.status}
                       {!row.erro && !row.statusReconhecido && (
-                        <span className="ml-2 text-xs text-amber-700">
+                        <span className="ml-2 text-xs text-amber-700 dark:text-amber-400">
                           (status "{row.statusOriginal}" não reconhecido — revisar)
                         </span>
                       )}
@@ -173,7 +173,7 @@ export default function ObrasEscoposImport({ onImportado }) {
           </Card>
 
           {invalidRows.length > 0 && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
               <p className="mb-2 font-medium">Linhas com erro (não serão enviadas):</p>
               <ul className="list-disc space-y-1 pl-5">
                 {invalidRows.map((row) => (

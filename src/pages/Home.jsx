@@ -68,43 +68,43 @@ export default function Home() {
   }, [ferramentasVisiveis])
 
   return (
-    <main className="flex-1 bg-surface p-4 sm:p-6">
+    <main className="flex-1 bg-surface p-4 sm:p-6 dark:bg-slate-900">
       <div className="mx-auto max-w-6xl">
         {/* Moldura com borda colorida fina: contexto + título à esquerda,
             sessão do usuário à direita. */}
-        <div className="overflow-hidden rounded-2xl border border-accent/25 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-accent/25 bg-white shadow-sm dark:bg-slate-800">
           <div className="h-1.5 bg-accent" />
           <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400 dark:text-slate-500">
                 Planejamento &amp; Controle de Obras
               </p>
-              <h1 className="mt-1 text-2xl font-semibold text-navy sm:text-3xl">
+              <h1 className="mt-1 text-2xl font-semibold text-navy sm:text-3xl dark:text-slate-100">
                 Planejamento Integrado{' '}
-                <span className="font-normal text-gray-400">· Painel de Ferramentas</span>
+                <span className="font-normal text-gray-400 dark:text-slate-500">· Painel de Ferramentas</span>
               </h1>
-              <p className="mt-1 text-sm text-gray-500">Ferramentas de controle interno INPASA</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Ferramentas de controle interno INPASA</p>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-surface px-3 py-2">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy text-sm font-semibold text-white">
+              <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-surface px-3 py-2 dark:border-slate-600 dark:bg-slate-700">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy text-sm font-semibold text-white dark:bg-accent">
                   {iniciais(profile?.nome, user?.email)}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-navy">
+                  <p className="truncate text-sm font-semibold text-navy dark:text-slate-100">
                     {profile?.nome || 'Usuário'}
                   </p>
-                  <p className="truncate text-xs text-gray-500">{user?.email}</p>
+                  <p className="truncate text-xs text-gray-500 dark:text-slate-400">{user?.email}</p>
                 </div>
-                <span className="ml-1 inline-flex shrink-0 items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                <span className="ml-1 inline-flex shrink-0 items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:border-slate-500 dark:text-slate-400">
                   {profile?.is_admin ? 'Admin' : 'Usuário'}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => signOut()}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 Sair
               </button>
@@ -113,10 +113,10 @@ export default function Home() {
         </div>
 
         <div className="mt-8 mb-3 flex items-center gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">
             Ferramentas disponíveis
           </p>
-          <div className="h-px flex-1 bg-gray-200" />
+          <div className="h-px flex-1 bg-gray-200 dark:bg-slate-700" />
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

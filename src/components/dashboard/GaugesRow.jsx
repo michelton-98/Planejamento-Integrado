@@ -30,7 +30,7 @@ export default function GaugesRow({ stats }) {
   return (
     <div className="flex flex-1 flex-wrap items-start justify-around gap-6">
       <div className="flex flex-col items-center">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">
           Taxa de Atraso
         </p>
         <GaugeChart
@@ -42,11 +42,11 @@ export default function GaugesRow({ stats }) {
       </div>
 
       <div className="flex flex-col items-center">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">
           Especialista x Contratada
         </p>
         {denomEstagio === 0 ? (
-          <div className="flex h-[104px] items-center text-sm text-gray-400">Sem dados</div>
+          <div className="flex h-[104px] items-center text-sm text-gray-400 dark:text-slate-500">Sem dados</div>
         ) : (
           <GaugeChart
             segments={[

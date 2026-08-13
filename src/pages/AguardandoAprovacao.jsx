@@ -8,7 +8,7 @@ export default function AguardandoAprovacao() {
   if (loading) {
     return (
       <main className="flex flex-1 items-center justify-center p-6">
-        <p className="text-gray-500">Carregando...</p>
+        <p className="text-gray-500 dark:text-slate-400">Carregando...</p>
       </main>
     )
   }
@@ -31,10 +31,10 @@ export default function AguardandoAprovacao() {
         className="w-full max-w-sm"
         contentClassName="p-6 text-center"
       >
-        <h2 className="mb-2 text-lg font-semibold text-navy">
+        <h2 className="mb-2 text-lg font-semibold text-navy dark:text-slate-100">
           {recusado ? 'Cadastro recusado' : 'Cadastro em análise'}
         </h2>
-        <p className="mb-6 text-sm text-gray-600">
+        <p className="mb-6 text-sm text-gray-600 dark:text-slate-300">
           {recusado
             ? 'Seu cadastro foi recusado por um administrador. Entre em contato caso acredite que isso seja um engano.'
             : 'Seu cadastro está aguardando aprovação de um administrador. Assim que for aprovado, você poderá acessar o sistema.'}
@@ -42,7 +42,7 @@ export default function AguardandoAprovacao() {
         <button
           type="button"
           onClick={() => signOut()}
-          className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
         >
           Sair
         </button>

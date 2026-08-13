@@ -18,7 +18,7 @@ function PrazoBadge({ prazo }) {
   }
 
   return (
-    <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+    <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-slate-300">
       No prazo
     </span>
   )
@@ -57,7 +57,7 @@ export default function DrilldownExplorer({
     <Card faixaCor="#12263f" categoria="Explorador">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-medium text-navy">Explorar pendências</h3>
+          <h3 className="text-sm font-medium text-navy dark:text-slate-100">Explorar pendências</h3>
           {selecionado && (
             <button
               type="button"
@@ -69,7 +69,7 @@ export default function DrilldownExplorer({
           )}
         </div>
 
-        <div className="inline-flex rounded-md border border-gray-200 p-0.5" role="group">
+        <div className="inline-flex rounded-md border border-gray-200 p-0.5 dark:border-slate-600" role="group">
           <button
             type="button"
             onClick={() => handleTipoChange('contratada')}
@@ -77,7 +77,7 @@ export default function DrilldownExplorer({
             className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
               tipo === 'contratada'
                 ? 'bg-accent text-white'
-                : 'text-gray-600 hover:bg-gray-50'
+                : 'text-gray-600 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-700'
             }`}
           >
             Contratada
@@ -89,7 +89,7 @@ export default function DrilldownExplorer({
             className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
               tipo === 'especialista'
                 ? 'bg-accent text-white'
-                : 'text-gray-600 hover:bg-gray-50'
+                : 'text-gray-600 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-700'
             }`}
           >
             Especialista
@@ -98,7 +98,7 @@ export default function DrilldownExplorer({
       </div>
 
       {nomes.length === 0 ? (
-        <p className="text-sm text-gray-500">Sem dados.</p>
+        <p className="text-sm text-gray-500 dark:text-slate-400">Sem dados.</p>
       ) : (
         <ul className="mb-4 flex flex-wrap gap-2">
           {nomes.map(({ nome, total }) => (
@@ -109,11 +109,11 @@ export default function DrilldownExplorer({
                 aria-pressed={selecionado === nome}
                 className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
                   selecionado === nome
-                    ? 'border-gold bg-gold/10 font-medium text-navy'
-                    : 'border-gray-200 text-gray-700 hover:border-accent hover:text-accent'
+                    ? 'border-gold bg-gold/10 font-medium text-navy dark:text-slate-100'
+                    : 'border-gray-200 text-gray-700 hover:border-accent hover:text-accent dark:border-slate-600 dark:text-slate-300'
                 }`}
               >
-                {nome} <span className="text-gray-400">({total})</span>
+                {nome} <span className="text-gray-400 dark:text-slate-500">({total})</span>
               </button>
             </li>
           ))}
@@ -121,32 +121,32 @@ export default function DrilldownExplorer({
       )}
 
       {selecionado && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
+          <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
+            <thead className="bg-gray-50 dark:bg-slate-700/50">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Contrato</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Data do RDO</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Prazo</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">{colunaOutro}</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Contrato</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Data do RDO</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Prazo</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Escopo</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">{colunaOutro}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-gray-200 bg-white dark:divide-slate-700 dark:bg-slate-800">
               {detalhes.map((linha, index) => (
                 <tr key={index}>
-                  <td className="px-3 py-2 text-navy">{linha.numero_contrato || '—'}</td>
-                  <td className="px-3 py-2 text-navy">{formatarData(linha.data_relatorio)}</td>
+                  <td className="px-3 py-2 text-navy dark:text-slate-100">{linha.numero_contrato || '—'}</td>
+                  <td className="px-3 py-2 text-navy dark:text-slate-100">{formatarData(linha.data_relatorio)}</td>
                   <td className="px-3 py-2">
                     <PrazoBadge prazo={linha.prazo} />
                   </td>
-                  <td className="px-3 py-2 text-navy">{linha.escopo || '—'}</td>
-                  <td className="px-3 py-2 text-navy">{linha.outro || '—'}</td>
+                  <td className="px-3 py-2 text-navy dark:text-slate-100">{linha.escopo || '—'}</td>
+                  <td className="px-3 py-2 text-navy dark:text-slate-100">{linha.outro || '—'}</td>
                 </tr>
               ))}
               {detalhes.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-4 text-center text-gray-500">
+                  <td colSpan={5} className="px-3 py-4 text-center text-gray-500 dark:text-slate-400">
                     Nenhum registro encontrado.
                   </td>
                 </tr>

@@ -43,7 +43,7 @@ export default function RdosSemObra({ refreshToken, onSolicitarCadastro }) {
 
   if (loading) {
     return (
-      <div className="mb-6 flex items-center gap-2 text-sm text-gray-500">
+      <div className="mb-6 flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
         <Spinner className="h-4 w-4 text-accent" />
         Verificando RDOs sem obra cadastrada...
       </div>
@@ -71,7 +71,7 @@ export default function RdosSemObra({ refreshToken, onSolicitarCadastro }) {
         onClick={() => setExpandido((atual) => !atual)}
         className="flex w-full flex-wrap items-center justify-between gap-2 text-left"
       >
-        <span className="text-sm font-medium text-navy">
+        <span className="text-sm font-medium text-navy dark:text-slate-100">
           <span className="mr-2 inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-alert px-2 py-0.5 text-xs font-semibold text-white">
             {itens.length}
           </span>
@@ -81,24 +81,24 @@ export default function RdosSemObra({ refreshToken, onSolicitarCadastro }) {
       </button>
 
       {expandido && (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
+          <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
+            <thead className="bg-gray-50 dark:bg-slate-700/50">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Empresa</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Escopo</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Contrato</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">RDOs</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Ação</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Empresa</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Escopo</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Contrato</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">RDOs</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Ação</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-gray-200 bg-white dark:divide-slate-700 dark:bg-slate-800">
               {itens.map((item, indice) => (
                 <tr key={indice}>
-                  <td className="px-3 py-2 text-navy">{item.empresa || '—'}</td>
-                  <td className="px-3 py-2 text-navy">{item.escopo || '—'}</td>
-                  <td className="px-3 py-2 text-navy">{item.numero_contrato ?? '—'}</td>
-                  <td className="px-3 py-2 text-navy">{item.total}</td>
+                  <td className="px-3 py-2 text-navy dark:text-slate-100">{item.empresa || '—'}</td>
+                  <td className="px-3 py-2 text-navy dark:text-slate-100">{item.escopo || '—'}</td>
+                  <td className="px-3 py-2 text-navy dark:text-slate-100">{item.numero_contrato ?? '—'}</td>
+                  <td className="px-3 py-2 text-navy dark:text-slate-100">{item.total}</td>
                   <td className="px-3 py-2">
                     <button
                       type="button"

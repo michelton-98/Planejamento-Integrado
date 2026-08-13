@@ -22,7 +22,7 @@ import ToggleModo from './ToggleModo'
 const ANCORA_QUARTA = '2020-01-01'
 
 const CAMPO_DATA_CLASSE =
-  'rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400'
+  'rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark] dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
 
 /**
  * Slide-over "Emitir Relatório" da aba Data_Base do Controle de Validações:
@@ -113,17 +113,17 @@ export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, 
         role="dialog"
         aria-modal="true"
         aria-label="Emitir relatório de validações"
-        className={`absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-xl transition-transform duration-300 ${
+        className={`absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-xl transition-transform duration-300 dark:bg-slate-800 ${
           aberto ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-navy">Emitir Relatório</h2>
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-slate-700">
+          <h2 className="text-base font-semibold text-navy dark:text-slate-100">Emitir Relatório</h2>
           <button
             type="button"
             onClick={onFechar}
             aria-label="Fechar"
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
           >
             ✕
           </button>
@@ -133,7 +133,7 @@ export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, 
           <ToggleModo modo={modo} onChange={setModo} />
 
           {modo === 'semanal' ? (
-            <label className="flex flex-col gap-1 text-sm text-gray-600">
+            <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-slate-300">
               Data de referência
               <input
                 type="date"
@@ -144,7 +144,7 @@ export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, 
             </label>
           ) : (
             <div className="flex flex-col gap-4">
-              <label className="flex flex-col gap-1 text-sm text-gray-600">
+              <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-slate-300">
                 Início do período
                 <input
                   type="date"
@@ -159,7 +159,7 @@ export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, 
                 )}
               </label>
 
-              <label className="flex flex-col gap-1 text-sm text-gray-600">
+              <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-slate-300">
                 Fim do período
                 <input
                   type="date"
@@ -174,7 +174,7 @@ export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, 
                   }}
                   className={CAMPO_DATA_CLASSE}
                 />
-                {!inicioValido && <span className="text-xs text-gray-400">Escolha primeiro o início do período.</span>}
+                {!inicioValido && <span className="text-xs text-gray-400 dark:text-slate-500">Escolha primeiro o início do período.</span>}
                 {inicioValido && fimPeriodo && !fimValido && (
                   <span className="text-xs text-alert">
                     Selecione uma quarta-feira entre {inicioPeriodo.split('-').reverse().join('/')} e{' '}
@@ -184,7 +184,7 @@ export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, 
               </label>
 
               {fimValido && (
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-400 dark:text-slate-500">
                   {quartasPreview.length} quarta{quartasPreview.length === 1 ? '' : 's'}-feira
                   {quartasPreview.length === 1 ? '' : 's'} no período selecionado.
                 </p>

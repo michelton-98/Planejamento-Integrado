@@ -42,6 +42,39 @@ function quebrarTextoColuna(doc, valor, coluna, fonteLinha) {
   return doc.splitTextToSize(String(valor ?? '—'), larguraDisponivel)
 }
 
+/**
+ * Quebra uma célula "de duas partes" — usada na coluna Escopo do relatório
+ * Mensal: `valor` é `{ cabecalho, corpo }`, não uma string única.
+ * `cabecalho` (empresa + CT + travessão) sempre em negrito/navy; `corpo`
+ * (nome do escopo) sempre em cinza normal, começando numa linha nova —
+ * cada parte quebra (`splitTextToSize`) independente na largura da coluna,
+ * então o corpo nunca continua na mesma linha do fim do cabeçalho, mesmo
+ * quando o cabeçalho cabe numa linha só.
+ */
+function quebrarCelulaDuasPartes(doc, valor, coluna, fonteLinha) {
+  const larguraDisponivel = coluna.largura - PADDING_CELULA_H * 2
+  const linhas = []
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(fonteLinha)
+  doc.splitTextToSize(valor.cabecalho, larguraDisponivel).forEach((texto) => {
+    linhas.push({ texto, bold: true, cor: CORES.navy })
+  })
+
+  doc.setFont('helvetica', 'normal')
+  doc.splitTextToSize(valor.corpo, larguraDisponivel).forEach((texto) => {
+    linhas.push({ texto, bold: false, cor: CORES.cinzaTexto })
+  })
+
+  return linhas
+}
+
+/** Quebra a célula na largura da coluna — genérico (string) ou de duas partes (objeto), conforme a coluna. */
+function quebrarCelula(doc, valor, coluna, fonteLinha) {
+  if (coluna.duasPartes) return quebrarCelulaDuasPartes(doc, valor, coluna, fonteLinha)
+  return quebrarTextoColuna(doc, valor, coluna, fonteLinha)
+}
+
 // Desenha uma linha de texto já quebrada colocando em negrito o trecho
 // "(CT xxxxx)", se ele aparecer nela — usado nas colunas que combinam
 // nome da empresa/escopo com o número do contrato entre parênteses. jsPDF
@@ -132,8 +165,8 @@ function desenharTabela(doc, { x, y, colunas, linhas, fonteLinha = 8.5, alturaLi
   linhas.forEach((linha, indice) => {
     // 1) quebra o texto de cada coluna na largura real dela e usa o maior
     // número de linhas resultante pra definir a altura desta linha.
-    const linhasPorColuna = colunas.map((coluna, colIndice) => quebrarTextoColuna(doc, linha[colIndice], coluna, fonteLinha))
-    const maxLinhasTexto = Math.max(1, ...linhasPorColuna.map((textoQuebrado) => textoQuebrado.length))
+    const linhasPorColuna = colunas.map((coluna, colIndice) => quebrarCelula(doc, linha[colIndice], coluna, fonteLinha))
+    const maxLinhasTexto = Math.max(1, ...linhasPorColuna.map((celulaQuebrada) => celulaQuebrada.length))
     const alturaCalculada = maxLinhasTexto * alturaTextoLinha + PADDING_CELULA_V * 2
     const alturaLinhaAtual = Math.max(alturaLinha, alturaCalculada)
 
@@ -150,17 +183,33 @@ function desenharTabela(doc, { x, y, colunas, linhas, fonteLinha = 8.5, alturaLi
     let cx = x
     colunas.forEach((coluna, colIndice) => {
       const { tx, align } = posicaoTexto(coluna, cx)
-      const cor = coluna.cor ? coluna.cor(linha[colIndice]) : CORES.navy
+      const corPadrao = coluna.cor ? coluna.cor(linha[colIndice]) : CORES.navy
+      const celulaQuebrada = linhasPorColuna[colIndice]
 
-      linhasPorColuna[colIndice].forEach((textoLinha, indiceLinhaTexto) => {
-        const yBase = yAtual + PADDING_CELULA_V + fonteLinha + indiceLinhaTexto * alturaTextoLinha
-        if (coluna.negritoCT && align === 'left') {
-          desenharLinhaComNegritoCT(doc, textoLinha, tx, yBase, fonteLinha, cor)
+      // Alinhamento vertical: por padrão ao topo da célula (bom pra texto
+      // que pode quebrar em números de linha diferentes entre colunas da
+      // mesma linha); `alinharV: 'middle'` centraliza o bloco de texto na
+      // altura real da linha — usado nas colunas de quarta-feira do
+      // relatório Mensal, sempre 1 linha só ("Validado"/"Não Validado").
+      const offsetTopo =
+        coluna.alinharV === 'middle'
+          ? (alturaLinhaAtual - celulaQuebrada.length * alturaTextoLinha) / 2
+          : PADDING_CELULA_V
+
+      celulaQuebrada.forEach((item, indiceLinhaTexto) => {
+        const yBase = yAtual + offsetTopo + fonteLinha + indiceLinhaTexto * alturaTextoLinha
+        if (coluna.duasPartes) {
+          doc.setFont('helvetica', item.bold ? 'bold' : 'normal')
+          doc.setFontSize(fonteLinha)
+          doc.setTextColor(...hexParaRgb(item.cor))
+          doc.text(item.texto, tx, yBase, { align })
+        } else if (coluna.negritoCT && align === 'left') {
+          desenharLinhaComNegritoCT(doc, item, tx, yBase, fonteLinha, corPadrao)
         } else {
           doc.setFont('helvetica', 'normal')
           doc.setFontSize(fonteLinha)
-          doc.setTextColor(...hexParaRgb(cor))
-          doc.text(textoLinha, tx, yBase, { align })
+          doc.setTextColor(...hexParaRgb(corPadrao))
+          doc.text(item, tx, yBase, { align })
         }
       })
 
@@ -303,18 +352,27 @@ export async function gerarRelatorioValidacoesMensalPdf({ inicioPeriodo, fimPeri
   const larguraEscopo = 170
   const larguraColunaData = (larguraUtil - larguraEscopo) / Math.max(quartas.length, 1)
   const colunas = [
-    { titulo: 'Escopo', largura: larguraEscopo, negritoCT: true },
+    // Célula de duas partes (ver quebrarCelulaDuasPartes): "Empresa (CT
+    // xxxxx) —" inteiro em negrito, e o nome do escopo em cinza claro
+    // numa linha nova abaixo, sempre — mesmo quando o cabeçalho cabe
+    // numa linha só.
+    { titulo: 'Escopo', largura: larguraEscopo, duasPartes: true },
     ...quartas.map((data) => ({
       titulo: formatarDataISOBr(data).slice(0, 5), // DD/MM
       largura: larguraColunaData,
       alinhar: 'center',
+      // Sempre 1 linha só ("Validado"/"Não Validado"/"—") — centralizada
+      // verticalmente na altura real da linha (que agora varia conforme
+      // o escopo quebra em mais ou menos linhas na coluna ao lado).
+      alinharV: 'middle',
       cor: (valor) => (valor === 'Validado' ? CORES.success : valor === '—' ? CORES.cinzaTexto : CORES.alert),
     })),
   ]
   const linhasTabela = linhas.map(({ escopo, celulas }) => [
-    escopo.numero_contrato
-      ? `${escopo.empresa} (CT ${escopo.numero_contrato}) — ${escopo.escopo}`
-      : `${escopo.empresa} — ${escopo.escopo}`,
+    {
+      cabecalho: escopo.numero_contrato ? `${escopo.empresa} (CT ${escopo.numero_contrato}) —` : `${escopo.empresa} —`,
+      corpo: escopo.escopo,
+    },
     ...celulas.map((celula) => (celula.registro ? (celula.validado ? 'Validado' : 'Não Validado') : '—')),
   ])
 
