@@ -308,7 +308,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
             <select
               value={filtroDisciplina}
               onChange={(event) => setFiltroDisciplina(event.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
             >
               <option value="">Todas as disciplinas</option>
               {DISCIPLINAS.map((disciplina) => (
@@ -320,7 +320,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
             <select
               value={filtroStatus}
               onChange={(event) => setFiltroStatus(event.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
             >
               <option value="">Todos os status</option>
               {STATUS_OFICIAIS.map((status) => (
@@ -375,7 +375,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
                           handleCampoChange(obra, 'disciplina', event.target.value || null)
                         }
                         disabled={salvandoId === obra.id}
-                        className="rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                        className="rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
                       >
                         <option value="">—</option>
                         {DISCIPLINAS.map((disciplina) => (
@@ -390,7 +390,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
                         value={obra.status}
                         onChange={(event) => handleCampoChange(obra, 'status', event.target.value)}
                         disabled={salvandoId === obra.id}
-                        className="rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                        className="rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
                       >
                         {STATUS_OFICIAIS.map((status) => (
                           <option key={status} value={status}>
@@ -459,7 +459,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
             <select
               value={form.disciplina}
               onChange={(event) => setForm((f) => ({ ...f, disciplina: event.target.value }))}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
             >
               <option value="">Disciplina —</option>
               {DISCIPLINAS.map((disciplina) => (
@@ -471,7 +471,7 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
             <select
               value={form.status}
               onChange={(event) => setForm((f) => ({ ...f, status: event.target.value }))}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
             >
               {STATUS_OFICIAIS.map((status) => (
                 <option key={status} value={status}>

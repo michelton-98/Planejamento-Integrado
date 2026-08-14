@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import ToolCard from '../components/ToolCard'
-import { FERRAMENTAS } from '../lib/ferramentas'
+import { FERRAMENTAS, temAcessoFerramenta } from '../lib/ferramentas'
 
 // "Michel Guimarães Ribeiro" -> "MG" (primeira letra do primeiro e do
 // último nome); sem nome cadastrado, cai pra primeira letra do e-mail.
@@ -20,8 +20,12 @@ export default function Home() {
   const { user, profile, signOut } = useAuth()
 
   const ferramentasVisiveis = useMemo(
-    () => FERRAMENTAS.filter((ferramenta) => !ferramenta.somenteAdmin || profile?.is_admin),
-    [profile?.is_admin],
+    () =>
+      FERRAMENTAS.filter(
+        (ferramenta) =>
+          (!ferramenta.somenteAdmin || profile?.is_admin) && temAcessoFerramenta(profile, ferramenta.chave),
+      ),
+    [profile],
   )
 
   // Estado do resumo de cada card, por chave da ferramenta:

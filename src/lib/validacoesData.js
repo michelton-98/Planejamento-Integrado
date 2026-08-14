@@ -8,6 +8,16 @@ import { supabase } from './supabaseClient'
 export const STATUS_ESCOPO = ['Ativa', 'Concluída', 'Paralisada']
 export const STATUS_ESCOPO_PADRAO = 'Ativa'
 
+// Opções fixas do campo "Disciplina" do cadastro de escopo (ver migration
+// 0013). Obrigatório só em cadastros novos (validado no front-end, ver
+// ValidacoesDataBase.jsx) — escopos cadastrados antes da migration podem
+// ter `disciplina: null`, exibido como "Não informado" (rotuloDisciplina).
+export const DISCIPLINAS_ESCOPO = ['Civil', 'Metal', 'Elétrica', 'Instrumentação', 'Rotativos']
+
+export function rotuloDisciplina(disciplina) {
+  return disciplina || 'Não informado'
+}
+
 // As 6 opções fixas do campo "Consideração" — o valor é o texto gravado
 // no banco (enum via check constraint, ver migration 0011); a descrição é
 // só contexto exibido na interface, não é persistida.

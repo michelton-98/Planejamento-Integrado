@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../lib/AuthContext'
+import { FERRAMENTAS } from '../../lib/ferramentas'
 import Spinner from '../../components/Spinner'
 import Card from '../../components/Card'
+
+const SELECT_USUARIOS =
+  'id, nome, email, funcao, status_aprovacao, is_admin, is_master, ferramentas_permitidas, criado_em'
+
+// Ferramentas elegíveis pro checklist de "Personalizar Acesso": vem do
+// mesmo catálogo usado pra montar os cards do Painel (ferramentas.jsx),
+// menos as `somenteAdmin` (ex.: "Gestão de Usuários") — essas já são
+// liberadas automaticamente só pra admins, fora desse mecanismo. Assim,
+// uma ferramenta nova cadastrada em FERRAMENTAS aparece aqui sozinha, sem
+// precisar tocar nesta tela.
+const FERRAMENTAS_PERSONALIZAVEIS = FERRAMENTAS.filter((ferramenta) => !ferramenta.somenteAdmin)
 
 const ORDEM_STATUS = { pendente: 0, aprovado: 1, recusado: 2 }
 
@@ -33,7 +45,7 @@ function Badge({ className, children }) {
 // de verdade mora no banco (trigger na tabela perfis + checagem na Edge
 // Function de exclusão); aqui a UI só reflete isso desabilitando os botões.
 export default function AdminUsuarios() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -43,13 +55,22 @@ export default function AdminUsuarios() {
   // clicar em Aprovar.
   const [concederAdmin, setConcederAdmin] = useState({})
 
+  // "Personalizar Acesso" (só a conta master vê/usa, ver profile?.is_master
+  // abaixo): id do usuário com o painel de checkboxes aberto, seleção em
+  // edição ({ [chave]: bool }) e estado de salvamento — tudo local até
+  // clicar em Salvar.
+  const [personalizandoId, setPersonalizandoId] = useState(null)
+  const [selecaoFerramentas, setSelecaoFerramentas] = useState({})
+  const [salvandoPersonalizacao, setSalvandoPersonalizacao] = useState(false)
+  const [erroPersonalizacao, setErroPersonalizacao] = useState(null)
+
   const carregarUsuarios = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     const { data, error } = await supabase
       .from('perfis')
-      .select('id, nome, email, funcao, status_aprovacao, is_admin, is_master, criado_em')
+      .select(SELECT_USUARIOS)
       .order('criado_em', { ascending: true })
 
     if (error) {
@@ -94,7 +115,7 @@ export default function AdminUsuarios() {
       .from('perfis')
       .update(payload)
       .eq('id', id)
-      .select('id, nome, email, funcao, status_aprovacao, is_admin, is_master, criado_em')
+      .select(SELECT_USUARIOS)
       .single()
 
     setProcessandoId(null)
@@ -119,7 +140,7 @@ export default function AdminUsuarios() {
       .from('perfis')
       .update({ is_admin: !usuario.is_admin })
       .eq('id', usuario.id)
-      .select('id, nome, email, funcao, status_aprovacao, is_admin, is_master, criado_em')
+      .select(SELECT_USUARIOS)
       .single()
 
     setProcessandoId(null)
@@ -132,6 +153,69 @@ export default function AdminUsuarios() {
     }
 
     setUsuarios((atual) => atual.map((item) => (item.id === usuario.id ? data : item)))
+  }
+
+  // Abre/fecha o painel de checkboxes pro usuário clicado. Ao abrir, marca
+  // cada ferramenta cujo checklist reflita o estado atual: null/vazio em
+  // ferramentas_permitidas = tudo marcado (acesso total, o padrão).
+  function alternarPersonalizacao(usuario) {
+    if (personalizandoId === usuario.id) {
+      setPersonalizandoId(null)
+      return
+    }
+
+    const permitidas = usuario.ferramentas_permitidas
+    const acessoTotal = !permitidas || permitidas.length === 0
+    const selecaoInicial = {}
+    FERRAMENTAS_PERSONALIZAVEIS.forEach((ferramenta) => {
+      selecaoInicial[ferramenta.chave] = acessoTotal || permitidas.includes(ferramenta.chave)
+    })
+
+    setSelecaoFerramentas(selecaoInicial)
+    setErroPersonalizacao(null)
+    setPersonalizandoId(usuario.id)
+  }
+
+  function alternarSelecaoFerramenta(chave) {
+    setSelecaoFerramentas((atual) => ({ ...atual, [chave]: !atual[chave] }))
+  }
+
+  async function salvarPersonalizacao(usuario) {
+    const selecionadas = FERRAMENTAS_PERSONALIZAVEIS.filter((ferramenta) => selecaoFerramentas[ferramenta.chave]).map(
+      (ferramenta) => ferramenta.chave,
+    )
+
+    if (selecionadas.length === 0) {
+      setErroPersonalizacao('Selecione ao menos uma ferramenta.')
+      return
+    }
+
+    setSalvandoPersonalizacao(true)
+    setErroPersonalizacao(null)
+
+    // Todas marcadas equivale a "sem personalização" — grava null em vez
+    // do array cheio, pra ferramentas criadas no futuro entrarem
+    // automaticamente no acesso total desse usuário (ver temAcessoFerramenta).
+    const valor = selecionadas.length === FERRAMENTAS_PERSONALIZAVEIS.length ? null : selecionadas
+
+    const { data, error } = await supabase
+      .from('perfis')
+      .update({ ferramentas_permitidas: valor })
+      .eq('id', usuario.id)
+      .select(SELECT_USUARIOS)
+      .single()
+
+    setSalvandoPersonalizacao(false)
+
+    if (error) {
+      // Aqui cai, por exemplo, a exceção do trigger que restringe esta
+      // coluna à conta master (ver migration 0014).
+      setErroPersonalizacao(error.message)
+      return
+    }
+
+    setUsuarios((atual) => atual.map((item) => (item.id === usuario.id ? data : item)))
+    setPersonalizandoId(null)
   }
 
   async function excluirUsuario(usuario) {
@@ -196,8 +280,9 @@ export default function AdminUsuarios() {
                         ? '#d1495b'
                         : '#178a54'
                   }
-                  contentClassName="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  contentClassName="flex flex-col gap-3 p-4"
                 >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-navy dark:text-slate-100">{usuario.nome || '(sem nome)'}</p>
@@ -265,6 +350,15 @@ export default function AdminUsuarios() {
                           {processando && <Spinner className="h-3.5 w-3.5" />}
                           {usuario.is_admin ? 'Rebaixar a usuário comum' : 'Promover a administrador'}
                         </button>
+                        {profile?.is_master && !usuario.is_admin && (
+                          <button
+                            type="button"
+                            onClick={() => alternarPersonalizacao(usuario)}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-accent/30 px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent/5"
+                          >
+                            {personalizandoId === usuario.id ? 'Fechar personalização' : 'Personalizar Acesso'}
+                          </button>
+                        )}
                         <button
                           type="button"
                           disabled={excluindo || usuario.is_master || vocêMesmo}
@@ -284,6 +378,54 @@ export default function AdminUsuarios() {
                       </div>
                     )}
                   </div>
+                  </div>
+
+                  {personalizandoId === usuario.id && (
+                    <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3 dark:border-accent/30">
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                        Ferramentas liberadas no Painel para {usuario.nome || usuario.email}
+                      </p>
+                      <div className="flex flex-wrap gap-4">
+                        {FERRAMENTAS_PERSONALIZAVEIS.map((ferramenta) => (
+                          <label
+                            key={ferramenta.chave}
+                            className="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(selecaoFerramentas[ferramenta.chave])}
+                              onChange={() => alternarSelecaoFerramenta(ferramenta.chave)}
+                              disabled={salvandoPersonalizacao}
+                              className="rounded border-gray-300 text-accent focus:ring-accent dark:border-slate-500 dark:bg-slate-700"
+                            />
+                            {ferramenta.titulo}
+                          </label>
+                        ))}
+                      </div>
+
+                      {erroPersonalizacao && <p className="mt-2 text-sm text-alert">{erroPersonalizacao}</p>}
+
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          disabled={salvandoPersonalizacao}
+                          onClick={() => salvarPersonalizacao(usuario)}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
+                        >
+                          {salvandoPersonalizacao && <Spinner className="h-3 w-3 text-white" />}
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={salvandoPersonalizacao}
+                          onClick={() => setPersonalizandoId(null)}
+                          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </Card>
               )
             })}

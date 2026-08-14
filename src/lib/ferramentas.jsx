@@ -114,6 +114,9 @@ export const FERRAMENTAS = [
   },
   {
     chave: 'usuarios',
+    // 'usuarios' fica de fora do checklist de "Personalizar Acesso" (ver
+    // AdminUsuarios.jsx) por causa de somenteAdmin: true — admins sempre
+    // têm acesso automático, não passa pelo mecanismo de personalização.
     titulo: 'Gestão de Usuários',
     categoria: 'Administração · Acesso',
     descricao: 'Aprove cadastros, promova administradores e remova acessos do sistema.',
@@ -132,3 +135,20 @@ export const FERRAMENTAS = [
     ),
   },
 ]
+
+/**
+ * `true` se `profile` pode ver/acessar a ferramenta `chave` no Painel —
+ * usado tanto pra filtrar os cards em Home.jsx quanto pra bloquear a rota
+ * direta em ProtectedRoute.jsx. Admins sempre têm acesso total (não passam
+ * pelo campo `ferramentas_permitidas`); pra usuários comuns, null/array
+ * vazio (nunca personalizado, ver migration 0014) também é acesso total —
+ * só uma lista explícita restringe. Ver AdminUsuarios.jsx ("Personalizar
+ * Acesso", exclusivo da conta master) para quem grava esse campo.
+ */
+export function temAcessoFerramenta(profile, chave) {
+  if (!profile) return false
+  if (profile.is_admin) return true
+  const permitidas = profile.ferramentas_permitidas
+  if (!permitidas || permitidas.length === 0) return true
+  return permitidas.includes(chave)
+}

@@ -86,7 +86,7 @@ function App() {
               path="/rdo"
               element={
                 <AppLayout>
-                  <ProtectedRoute>
+                  <ProtectedRoute ferramenta="rdo">
                     <>
                       <RdoToolNav />
                       <Rdo />
@@ -112,7 +112,7 @@ function App() {
               path="/validacoes"
               element={
                 <AppLayout>
-                  <ProtectedRoute>
+                  <ProtectedRoute ferramenta="validacoes">
                     <Validacoes />
                   </ProtectedRoute>
                 </AppLayout>

@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react'
-import { CONSIDERACOES, STATUS_ESCOPO, STATUS_ESCOPO_PADRAO } from '../../lib/validacoesData'
+import {
+  CONSIDERACOES,
+  DISCIPLINAS_ESCOPO,
+  STATUS_ESCOPO,
+  STATUS_ESCOPO_PADRAO,
+  rotuloDisciplina,
+} from '../../lib/validacoesData'
 import Spinner from '../Spinner'
 import Card from '../Card'
 
-const FORM_ESCOPO_VAZIO = { numero_contrato: '', empresa: '', escopo: '', status: STATUS_ESCOPO_PADRAO }
+const FORM_ESCOPO_VAZIO = { numero_contrato: '', empresa: '', escopo: '', disciplina: '', status: STATUS_ESCOPO_PADRAO }
 const FORM_SEMANAL_VAZIO = {
   data_recebimento: '',
   validado_planejamento: false,
@@ -44,9 +50,13 @@ function Checkzinho({ marcado, rotulo }) {
   )
 }
 
-function CampoEscopoForm({ valores, onChange }) {
+// `disciplinaObrigatoria`: true só no formulário de "Novo escopo" — exige
+// escolher uma disciplina antes de salvar. No formulário de edição fica
+// opcional (escopos cadastrados antes da migration 0013 não têm disciplina
+// definida e continuam sem até alguém escolher uma manualmente).
+function CampoEscopoForm({ valores, onChange, disciplinaObrigatoria = false }) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <input
         type="text"
         placeholder="Contrato (opcional)"
@@ -68,6 +78,21 @@ function CampoEscopoForm({ valores, onChange }) {
         onChange={(event) => onChange({ ...valores, escopo: event.target.value })}
         className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
       />
+      <select
+        value={valores.disciplina}
+        required={disciplinaObrigatoria}
+        onChange={(event) => onChange({ ...valores, disciplina: event.target.value })}
+        className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
+      >
+        <option value="">
+          {disciplinaObrigatoria ? 'Selecione a disciplina' : 'Não informado'}
+        </option>
+        {DISCIPLINAS_ESCOPO.map((disciplina) => (
+          <option key={disciplina} value={disciplina}>
+            {disciplina}
+          </option>
+        ))}
+      </select>
       <select
         value={valores.status}
         onChange={(event) => onChange({ ...valores, status: event.target.value })}
@@ -148,7 +173,7 @@ function FormValidacaoSemanal({ valoresIniciais = FORM_SEMANAL_VAZIO, textoSalva
         <select
           value={form.consideracao}
           onChange={(event) => setForm((f) => ({ ...f, consideracao: event.target.value }))}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
         >
           {CONSIDERACOES.map((item) => (
             <option key={item.valor} value={item.valor}>
@@ -188,7 +213,7 @@ function FormValidacaoSemanal({ valoresIniciais = FORM_SEMANAL_VAZIO, textoSalva
 // `.trim()` explode ao salvar sem tocar no campo e o React reclama de
 // input controlado virando não-controlado.
 function paraFormEscopo(escopo) {
-  return { ...escopo, numero_contrato: escopo.numero_contrato ?? '' }
+  return { ...escopo, numero_contrato: escopo.numero_contrato ?? '', disciplina: escopo.disciplina ?? '' }
 }
 
 // Mais recente primeiro por data_recebimento (não pela ordem de criação) —
@@ -237,6 +262,7 @@ function EscopoCard({
         numero_contrato: formEdicao.numero_contrato.trim() || null,
         empresa: formEdicao.empresa.trim(),
         escopo: formEdicao.escopo.trim(),
+        disciplina: formEdicao.disciplina || null,
         status: formEdicao.status,
       })
       setEditando(false)
@@ -312,7 +338,7 @@ function EscopoCard({
                 {escopo.empresa} <span className="text-gray-400 dark:text-slate-500">—</span> {escopo.escopo}
               </p>
               <p className="mt-0.5 text-xs uppercase tracking-wide text-gray-400 dark:text-slate-500">
-                Contrato {escopo.numero_contrato || '—'} ·{' '}
+                Contrato {escopo.numero_contrato || '—'} · {rotuloDisciplina(escopo.disciplina)} ·{' '}
                 <span className={`rounded-full px-1.5 py-0.5 ${COR_STATUS_ESCOPO[escopo.status]}`}>
                   {escopo.status}
                 </span>{' '}
@@ -494,7 +520,7 @@ export default function ValidacoesDataBase({
     const filtrados = !termo
       ? escopos
       : escopos.filter((escopo) => {
-          const campos = [escopo.numero_contrato, escopo.empresa, escopo.escopo, escopo.status]
+          const campos = [escopo.numero_contrato, escopo.empresa, escopo.escopo, escopo.disciplina, escopo.status]
           return campos.some((valor) => (valor ?? '').toString().toLowerCase().includes(termo))
         })
     // Sempre A-Z por empresa, recalculado a cada render (não é ordenação
@@ -511,6 +537,10 @@ export default function ValidacoesDataBase({
       setErroFormEscopo('Empresa e escopo são obrigatórios.')
       return
     }
+    if (!formEscopo.disciplina) {
+      setErroFormEscopo('Disciplina é obrigatória.')
+      return
+    }
 
     setCriandoEscopo(true)
     try {
@@ -518,6 +548,7 @@ export default function ValidacoesDataBase({
         numero_contrato: formEscopo.numero_contrato.trim() || null,
         empresa: formEscopo.empresa.trim(),
         escopo: formEscopo.escopo.trim(),
+        disciplina: formEscopo.disciplina,
         status: formEscopo.status,
       })
       setFormEscopo(FORM_ESCOPO_VAZIO)
@@ -532,7 +563,7 @@ export default function ValidacoesDataBase({
     <div className="flex flex-col gap-4">
       <Card faixaCor="#2f6fed" categoria="Cadastro" titulo="Novo escopo">
         <form onSubmit={handleAdicionarEscopo} className="flex flex-col gap-3">
-          <CampoEscopoForm valores={formEscopo} onChange={setFormEscopo} />
+          <CampoEscopoForm valores={formEscopo} onChange={setFormEscopo} disciplinaObrigatoria />
           <div>
             <button
               type="submit"
