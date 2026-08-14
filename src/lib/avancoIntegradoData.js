@@ -7,7 +7,8 @@ import { supabase } from './supabaseClient'
 // (public.is_approved(), ferramenta aberta a todo aprovado).
 
 export const BUCKET_AVANCO = 'avanco-arquivos'
-export const TAMANHO_MAXIMO_BYTES = 20 * 1024 * 1024 // 20 MB
+export const TAMANHO_MAXIMO_BYTES = 20 * 1024 * 1024 // 20 MB — upload genérico (QUALISOLDA)
+export const TAMANHO_MAXIMO_BYTES_FORTYS = 150 * 1024 * 1024 // 150 MB — cronograma .xml da FORTYS (arquivos reais passam de 90 MB)
 
 /** Busca todos os arquivos cadastrados de uma fase (todas as disciplinas/empresas/datas de uma vez). */
 export async function fetchAvancoArquivos(fase) {
@@ -17,6 +18,20 @@ export async function fetchAvancoArquivos(fase) {
     .eq('fase', fase)
     .order('data_referencia', { ascending: false })
 
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Busca os indicadores extraídos (ver migration 0019 e fortysXmlParse.js)
+ * de uma lista de `avanco_arquivos.id` — usado pra montar
+ * `indicadoresPorArquivo` (Map arquivo_id -> indicador[]) no
+ * DestilariaFase1.jsx, sempre que a lista de arquivos muda.
+ */
+export async function fetchAvancoIndicadores(arquivoIds) {
+  if (!arquivoIds || arquivoIds.length === 0) return []
+
+  const { data, error } = await supabase.from('avanco_indicadores').select('*').in('arquivo_id', arquivoIds)
   if (error) throw error
   return data ?? []
 }
@@ -112,6 +127,128 @@ export async function enviarArquivoAvanco({
     throw error
   }
   return data
+}
+
+/**
+ * Envia o cronograma .xml da FORTYS: sobe o arquivo UMA ÚNICA VEZ pro
+ * Storage e grava/atualiza DOIS registros em avanco_arquivos a partir dele
+ * (mesmo storage_path nos dois) — um com fase 'destilaria_fase_1' e outro
+ * com 'destilaria_fase_2' (ver migration 0016 pra fase/disciplina/empresa
+ * sem check constraint — os dois valores de fase usados aqui não
+ * precisam constar em nenhuma lista fixa do banco). `resultadoExtracao`
+ * é o retorno de parseFortysXml (ver fortysXmlParse.js): `{ fase1, fase2 }`,
+ * cada um com percentualPrevistoGeral/percentualExecutadoGeral +
+ * indicadores[].
+ *
+ * Ao contrário de enviarArquivoAvanco (genérico), aqui a checagem de
+ * "já existe arquivo pra essa combinação" é feita NO BANCO, não a partir
+ * do estado em memória do front — a página só carrega arquivos da Fase I
+ * (fase='destilaria_fase_1'), então não teria como saber se já existe
+ * registro da Fase II pra essa mesma Empresa+Escopo+Data.
+ */
+export async function enviarArquivoFortysXml({ escopo, dataReferencia, arquivo, resultadoExtracao, user, profile }) {
+  const disciplina = 'Metal'
+  const empresa = 'FORTYS'
+
+  const { data: existentes, error: erroExistentes } = await supabase
+    .from('avanco_arquivos')
+    .select('*')
+    .in('fase', ['destilaria_fase_1', 'destilaria_fase_2'])
+    .eq('disciplina', disciplina)
+    .eq('empresa', empresa)
+    .eq('escopo', escopo)
+    .eq('data_referencia', dataReferencia)
+
+  if (erroExistentes) throw erroExistentes
+  const existentePorFase = {
+    fase1: existentes.find((registro) => registro.fase === 'destilaria_fase_1') ?? null,
+    fase2: existentes.find((registro) => registro.fase === 'destilaria_fase_2') ?? null,
+  }
+
+  const storagePath = caminhoStorage({ fase: 'destilaria_fase_1', disciplina, empresa, escopo, dataReferencia, nomeArquivo: arquivo.name })
+  const { error: erroUpload } = await supabase.storage.from(BUCKET_AVANCO).upload(storagePath, arquivo)
+  if (erroUpload) throw erroUpload
+
+  const dadosComuns = {
+    nome_arquivo: arquivo.name,
+    tamanho_bytes: arquivo.size,
+    storage_path: storagePath,
+    enviado_por: user?.id ?? null,
+    enviado_por_nome: profile?.nome || null,
+    enviado_por_email: user?.email || null,
+  }
+
+  const registrosSalvos = {}
+  const idsInseridosParaDesfazer = []
+  const storagePathsAntigos = new Set()
+
+  try {
+    for (const [chave, faseId] of [
+      ['fase1', 'destilaria_fase_1'],
+      ['fase2', 'destilaria_fase_2'],
+    ]) {
+      const extraido = resultadoExtracao[chave]
+      const existente = existentePorFase[chave]
+      const payload = {
+        ...dadosComuns,
+        percentual_previsto_geral: extraido?.percentualPrevistoGeral ?? null,
+        percentual_executado_geral: extraido?.percentualExecutadoGeral ?? null,
+      }
+
+      let registro
+      if (existente) {
+        const { data, error } = await supabase.from('avanco_arquivos').update(payload).eq('id', existente.id).select().single()
+        if (error) throw error
+        registro = data
+        if (existente.storage_path !== storagePath) storagePathsAntigos.add(existente.storage_path)
+
+        // Reenvio: apaga os indicadores antigos desse arquivo antes de
+        // inserir os novos (ver requisito no prompt original).
+        const { error: erroLimpar } = await supabase.from('avanco_indicadores').delete().eq('arquivo_id', registro.id)
+        if (erroLimpar) throw erroLimpar
+      } else {
+        const { data, error } = await supabase
+          .from('avanco_arquivos')
+          .insert({ fase: faseId, disciplina, empresa, escopo, data_referencia: dataReferencia, ...payload })
+          .select()
+          .single()
+        if (error) throw error
+        registro = data
+        idsInseridosParaDesfazer.push(registro.id)
+      }
+
+      const indicadores = (extraido?.indicadores ?? []).map((item) => ({
+        arquivo_id: registro.id,
+        nome_indicador: item.nome,
+        percentual_previsto: item.percentualPrevisto,
+        percentual_executado: item.percentualExecutado,
+      }))
+      if (indicadores.length > 0) {
+        const { error: erroIndicadores } = await supabase.from('avanco_indicadores').insert(indicadores)
+        if (erroIndicadores) throw erroIndicadores
+      }
+
+      registrosSalvos[chave] = registro
+    }
+  } catch (err) {
+    // Desfaz o que deu pra desfazer antes de propagar o erro: registros
+    // recém-inseridos (updates a registros pré-existentes ficam como
+    // estavam, só sem indicadores novos) + o upload físico, pra não deixar
+    // um arquivo de ~90MB órfão no Storage.
+    if (idsInseridosParaDesfazer.length > 0) {
+      await supabase.from('avanco_arquivos').delete().in('id', idsInseridosParaDesfazer)
+    }
+    await supabase.storage.from(BUCKET_AVANCO).remove([storagePath])
+    throw err
+  }
+
+  // Só remove o(s) arquivo(s) antigo(s) do Storage depois que os DOIS
+  // registros já foram confirmados no banco.
+  if (storagePathsAntigos.size > 0) {
+    await supabase.storage.from(BUCKET_AVANCO).remove([...storagePathsAntigos])
+  }
+
+  return registrosSalvos
 }
 
 /** Baixa o arquivo de um registro (bucket privado — passa pela mesma RLS de leitura) e dispara o download no navegador. */

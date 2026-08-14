@@ -29,9 +29,24 @@ export const FASES_AVANCO = [
 // nenhuma disciplina habilitada pra Input).
 export const DISCIPLINAS_AVANCO = ['Civil', 'Metal', 'Elétrica', 'Instrumentação']
 
-// Empresas -> escopos por disciplina, dentro de cada fase. Disciplina
+// Os 6 indicadores fixos extraídos do cronograma MS Project da FORTYS (ver
+// src/lib/fortysXmlParse.js) — mesmos nomes usados antes como "escopo" da
+// FORTYS, agora reaproveitados como nome de linha da tabela de indicadores
+// (ver migration 0019, tabela avanco_indicadores). A ORDEM desta lista é a
+// ordem de exibição nas telas (Dashboard/Data_Base).
+export const INDICADORES_FORTYS = ['Colunas', 'Nível +5000', 'Nível +10000', 'Nível +15000', 'Escadas', 'Plataformas']
+
+// Empresas -> config por disciplina, dentro de cada fase. Disciplina
 // ausente aqui (ou com `empresas: {}`) = ainda sem nenhuma empresa
 // cadastrada nessa fase (ver estado vazio do Dashboard/Data_Base).
+//
+// Cada empresa tem `escopos` (lista de opções do seletor de Escopo) e
+// `tipoInput`:
+//   - 'generico': upload de qualquer arquivo, sem processamento (fluxo
+//     original da ferramenta — QUALISOLDA).
+//   - 'xml_ms_project': upload restrito a .xml do MS Project, com
+//     extração automática de indicadores no navegador (só FORTYS por
+//     enquanto — ver AvancoInput.jsx/fortysXmlParse.js).
 //
 // Propositalmente SEM check constraint equivalente no banco (ver migration
 // 0016): a lista de disciplinas/empresas/escopos válidos vive só aqui, pra
@@ -44,16 +59,14 @@ export const AVANCO_CONFIG = {
     Metal: {
       habilitada: true,
       empresas: {
-        QUALISOLDA: [
-          'Isométricos de Inox',
-          'Isométricos de Carbono',
-          'Mols',
-          'Torres',
-          'Bombas',
-          'SIs',
-          'Trocadores de Calor',
-        ],
-        FORTYS: ['Colunas', 'Nível +5000', 'Nível +10000', 'Nível +15000', 'Escadas', 'Plataformas'],
+        QUALISOLDA: {
+          tipoInput: 'generico',
+          escopos: ['Interligação de Carbono', 'Interligação de Inox e Equipamentos'],
+        },
+        FORTYS: {
+          tipoInput: 'xml_ms_project',
+          escopos: ['Prédio (Estrutura Principal)'],
+        },
       },
     },
     Elétrica: { habilitada: false, empresas: {} },
@@ -68,7 +81,7 @@ export function configDisciplina(fase, disciplina) {
 
 /** Escopos cadastrados pra uma empresa específica, dentro de uma disciplina/fase. */
 export function escoposDaEmpresa(fase, disciplina, empresa) {
-  return configDisciplina(fase, disciplina).empresas?.[empresa] ?? []
+  return configDisciplina(fase, disciplina).empresas?.[empresa]?.escopos ?? []
 }
 
 /**
@@ -87,12 +100,13 @@ export function listarEmpresasDaFase(fase) {
   return lista.sort((a, b) => a.empresa.localeCompare(b.empresa, 'pt-BR'))
 }
 
-/** Disciplina + lista de escopos de uma empresa, procurando em todas as disciplinas da fase (uma empresa pertence a uma única disciplina). */
+/** Disciplina + escopos + tipoInput de uma empresa, procurando em todas as disciplinas da fase (uma empresa pertence a uma única disciplina). */
 export function buscarEmpresa(fase, empresa) {
   const disciplinas = AVANCO_CONFIG[fase] ?? {}
   for (const [disciplina, config] of Object.entries(disciplinas)) {
-    if (config.empresas?.[empresa]) {
-      return { disciplina, escopos: config.empresas[empresa] }
+    const configEmpresa = config.empresas?.[empresa]
+    if (configEmpresa) {
+      return { disciplina, escopos: configEmpresa.escopos, tipoInput: configEmpresa.tipoInput }
     }
   }
   return null

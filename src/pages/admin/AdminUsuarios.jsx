@@ -16,7 +16,15 @@ const SELECT_USUARIOS =
 // precisar tocar nesta tela.
 const FERRAMENTAS_PERSONALIZAVEIS = FERRAMENTAS.filter((ferramenta) => !ferramenta.somenteAdmin)
 
-const ORDEM_STATUS = { pendente: 0, aprovado: 1, recusado: 2 }
+// Ordem de exibição: conta Master primeiro, depois Admins, depois
+// usuários comuns — dentro de cada grupo, ordem alfabética (ver
+// usuariosOrdenados abaixo). Pendentes/recusados não formam mais um grupo
+// à parte; entram no grupo de "comuns" (nenhum pendente/recusado é admin).
+function grupoUsuario(usuario) {
+  if (usuario.is_master) return 0
+  if (usuario.is_admin) return 1
+  return 2
+}
 
 const ROTULO_STATUS = {
   pendente: 'Pendente',
@@ -93,8 +101,8 @@ export default function AdminUsuarios() {
   const usuariosOrdenados = useMemo(
     () =>
       [...usuarios].sort((a, b) => {
-        const diffStatus = ORDEM_STATUS[a.status_aprovacao] - ORDEM_STATUS[b.status_aprovacao]
-        if (diffStatus !== 0) return diffStatus
+        const diffGrupo = grupoUsuario(a) - grupoUsuario(b)
+        if (diffGrupo !== 0) return diffGrupo
         return (a.nome || a.email || '').localeCompare(b.nome || b.email || '', 'pt-BR')
       }),
     [usuarios],

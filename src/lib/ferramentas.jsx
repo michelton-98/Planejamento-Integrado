@@ -69,28 +69,51 @@ async function estatisticasValidacoes() {
 }
 
 // Resumo do card "Avanço Integrado": total de arquivos já enviados +
-// cobertura média de envio (ver calcularAvancoPorEmpresa) entre as
-// empresas que já têm pelo menos 1 arquivo — só considera a Destilaria
-// Fase I por enquanto, a única fase/ferramenta de verdade habilitada
-// (ver FASES_AVANCO em avancoIntegradoConfig.js).
+// cobertura média de envio (empresas de input genérico, ex. QUALISOLDA) +
+// % executado mais recente do cronograma (empresas de input xml_ms_project,
+// ex. FORTYS) — só considera a Destilaria Fase I por enquanto, a única
+// fase/ferramenta de verdade habilitada (ver FASES_AVANCO em
+// avancoIntegradoConfig.js).
 async function estatisticasAvancoIntegrado() {
   const fase = FASES_AVANCO[0].chave
   const arquivos = await fetchAvancoArquivos(fase)
 
-  const indicadores = Object.entries(AVANCO_CONFIG[fase] ?? {}).flatMap(([disciplina, config]) =>
-    calcularAvancoPorEmpresa(
-      arquivos.filter((arquivo) => arquivo.disciplina === disciplina),
-      config.empresas ?? {},
-    ),
+  const indicadoresCobertura = Object.entries(AVANCO_CONFIG[fase] ?? {}).flatMap(([disciplina, config]) =>
+    Object.entries(config.empresas ?? {})
+      .filter(([, configEmpresa]) => configEmpresa.tipoInput !== 'xml_ms_project')
+      .flatMap(([empresa, configEmpresa]) =>
+        calcularAvancoPorEmpresa(
+          arquivos.filter((arquivo) => arquivo.disciplina === disciplina),
+          { [empresa]: configEmpresa.escopos },
+        ),
+      ),
   )
-  const comDados = indicadores.filter((indicador) => indicador.dataReferencia)
+  const comDados = indicadoresCobertura.filter((indicador) => indicador.dataReferencia)
   const coberturaMedia = comDados.length
     ? Math.round(comDados.reduce((soma, indicador) => soma + indicador.percentual, 0) / comDados.length)
     : 0
 
+  // Cronograma FORTYS: % executado geral do arquivo com data_referencia
+  // mais recente (mesma ideia de "data mais recente" usada em
+  // calcularAvancoPorEmpresa, só que lendo direto de avanco_arquivos —
+  // aqui já é um valor percentual pronto, não uma cobertura de envio).
+  const maisRecenteFortys = arquivos
+    .filter((arquivo) => arquivo.empresa === 'FORTYS')
+    .reduce((maisRecente, atual) => (!maisRecente || atual.data_referencia > maisRecente.data_referencia ? atual : maisRecente), null)
+
+  const barras = []
+  if (comDados.length) barras.push({ rotulo: 'Cobertura média de envio', percentual: coberturaMedia, cor: '#7c3aed' })
+  if (maisRecenteFortys?.percentual_executado_geral != null) {
+    barras.push({
+      rotulo: 'Execução FORTYS (cronograma)',
+      percentual: Math.round(maisRecenteFortys.percentual_executado_geral),
+      cor: '#7c3aed',
+    })
+  }
+
   return {
     colunas: [{ valor: arquivos.length, rotulo: 'Arquivos enviados' }],
-    barras: comDados.length ? [{ rotulo: 'Cobertura média de envio', percentual: coberturaMedia, cor: '#7c3aed' }] : [],
+    barras,
   }
 }
 

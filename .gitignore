@@ -17,6 +17,11 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Arquivo de exemplo real (cronograma MS Project) usado só pra validar o
+# parser da FORTYS localmente — não é pra entrar no repositório (é grande,
+# ~90MB, e é dado real de obra).
+FORTYS-CR-CT-29489-REV13.xml
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

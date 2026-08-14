@@ -3,6 +3,7 @@ import { buscarEmpresa, listarEmpresasDaFase } from '../../lib/avancoIntegradoCo
 import { baixarArquivoAvanco } from '../../lib/avancoIntegradoData'
 import Card from '../Card'
 import Spinner from '../Spinner'
+import TabelaIndicadoresFortys, { formatarPercentualIndicador } from './TabelaIndicadoresFortys'
 
 function formatarDataBR(dataISO) {
   if (!dataISO) return '—'
@@ -22,7 +23,7 @@ function formatarTamanho(bytes) {
  * pro escopo. Cadastro/substituição de arquivo acontece só na aba Input
  * (ver AvancoInput.jsx); esta aba nunca escreve em avanco_arquivos.
  */
-export default function AvancoDataBase({ fase, arquivos }) {
+export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo }) {
   const empresas = useMemo(() => listarEmpresasDaFase(fase), [fase])
   const [empresaSelecionada, setEmpresaSelecionada] = useState(empresas[0]?.empresa ?? '')
   const [dataSelecionada, setDataSelecionada] = useState('')
@@ -45,7 +46,16 @@ export default function AvancoDataBase({ fase, arquivos }) {
     setDataSelecionada((atual) => (datasDisponiveis.includes(atual) ? atual : (datasDisponiveis[0] ?? '')))
   }, [datasDisponiveis])
 
-  const { escopos } = buscarEmpresa(fase, empresaSelecionada) ?? { escopos: [] }
+  const { escopos, tipoInput } = buscarEmpresa(fase, empresaSelecionada) ?? { escopos: [], tipoInput: 'generico' }
+
+  // Só existe pra empresas de cronograma (tipoInput 'xml_ms_project', ver
+  // avancoIntegradoConfig.js) — o arquivo da data selecionada, com o %
+  // geral + os 6 indicadores extraídos dele (ver migration 0019).
+  const arquivoCronograma =
+    tipoInput === 'xml_ms_project'
+      ? (arquivosDaEmpresa.find((item) => item.data_referencia === dataSelecionada) ?? null)
+      : null
+  const indicadoresCronograma = arquivoCronograma ? (indicadoresPorArquivo.get(arquivoCronograma.id) ?? []) : []
 
   const linhas = useMemo(
     () =>
@@ -113,6 +123,26 @@ export default function AvancoDataBase({ fase, arquivos }) {
       </div>
 
       {erroDownload && <p className="text-sm text-alert">{erroDownload}</p>}
+
+      {arquivoCronograma && (
+        <Card faixaCor="#7c3aed" categoria={empresaSelecionada} titulo="Avanço do cronograma (MS Project)">
+          <div className="mb-4 flex gap-3">
+            <div className="flex-1 rounded-lg bg-gray-50 p-3 text-center dark:bg-slate-700/40">
+              <p className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-slate-500">% Previsto</p>
+              <p className="text-2xl font-semibold text-navy dark:text-slate-100">
+                {formatarPercentualIndicador(arquivoCronograma.percentual_previsto_geral)}
+              </p>
+            </div>
+            <div className="flex-1 rounded-lg bg-gray-50 p-3 text-center dark:bg-slate-700/40">
+              <p className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-slate-500">% Executado</p>
+              <p className="text-2xl font-semibold text-accent">
+                {formatarPercentualIndicador(arquivoCronograma.percentual_executado_geral)}
+              </p>
+            </div>
+          </div>
+          <TabelaIndicadoresFortys indicadores={indicadoresCronograma} />
+        </Card>
+      )}
 
       <Card faixaCor="#7c3aed" categoria={empresaSelecionada} titulo={dataSelecionada ? `Escopos em ${formatarDataBR(dataSelecionada)}` : 'Escopos'}>
         {linhas.length === 0 ? (

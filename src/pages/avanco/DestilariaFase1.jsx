@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../lib/AuthContext'
 import { DISCIPLINAS_AVANCO } from '../../lib/avancoIntegradoConfig'
-import { fetchAvancoArquivos, salvarDisciplinasDashboard } from '../../lib/avancoIntegradoData'
+import { fetchAvancoArquivos, fetchAvancoIndicadores, salvarDisciplinasDashboard } from '../../lib/avancoIntegradoData'
 import Spinner from '../../components/Spinner'
 import AvancoDashboard from '../../components/avanco/AvancoDashboard'
 import AvancoDataBase from '../../components/avanco/AvancoDataBase'
@@ -27,6 +27,7 @@ export default function DestilariaFase1() {
 
   const [aba, setAba] = useState('dashboard')
   const [arquivos, setArquivos] = useState([])
+  const [indicadoresPorArquivo, setIndicadoresPorArquivo] = useState(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -58,6 +59,39 @@ export default function DestilariaFase1() {
       ativo = false
     }
   }, [])
+
+  // Indicadores extraídos do cronograma (ver migration 0019), só existem
+  // pra arquivos da FORTYS (tipoInput 'xml_ms_project') — refeito sempre
+  // que `arquivos` muda (carga inicial ou depois de um upload novo), pra
+  // Dashboard e Data_Base sempre lerem a versão mais recente.
+  useEffect(() => {
+    let ativo = true
+    const idsFortys = arquivos.filter((item) => item.empresa === 'FORTYS').map((item) => item.id)
+
+    if (idsFortys.length === 0) {
+      setIndicadoresPorArquivo(new Map())
+      return
+    }
+
+    fetchAvancoIndicadores(idsFortys)
+      .then((lista) => {
+        if (!ativo) return
+        const mapa = new Map()
+        for (const item of lista) {
+          const atual = mapa.get(item.arquivo_id) ?? []
+          atual.push(item)
+          mapa.set(item.arquivo_id, atual)
+        }
+        setIndicadoresPorArquivo(mapa)
+      })
+      .catch((err) => {
+        if (ativo) setError(err.message)
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [arquivos])
 
   // Reflete o filtro salvo no perfil sempre que ele mudar (login em outro
   // computador, refreshProfile após salvar aqui mesmo etc.).
@@ -126,12 +160,13 @@ export default function DestilariaFase1() {
           <AvancoDashboard
             fase={FASE}
             arquivos={arquivos}
+            indicadoresPorArquivo={indicadoresPorArquivo}
             disciplinasSelecionadas={disciplinasSelecionadas}
             onAlterarDisciplinas={handleAlterarDisciplinas}
             salvando={salvandoDisciplinas}
           />
         ) : aba === 'dados' ? (
-          <AvancoDataBase fase={FASE} arquivos={arquivos} />
+          <AvancoDataBase fase={FASE} arquivos={arquivos} indicadoresPorArquivo={indicadoresPorArquivo} />
         ) : (
           <AvancoInput fase={FASE} arquivos={arquivos} user={user} profile={profile} onArquivoEnviado={handleArquivoEnviado} />
         )}
