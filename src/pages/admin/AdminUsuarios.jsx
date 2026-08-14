@@ -6,7 +6,7 @@ import Spinner from '../../components/Spinner'
 import Card from '../../components/Card'
 
 const SELECT_USUARIOS =
-  'id, nome, email, funcao, status_aprovacao, is_admin, is_master, ferramentas_permitidas, criado_em'
+  'id, nome, email, funcao, status_aprovacao, is_admin, is_master, ferramentas_permitidas, pode_importar_rdos, criado_em'
 
 // Ferramentas elegíveis pro checklist de "Personalizar Acesso": vem do
 // mesmo catálogo usado pra montar os cards do Painel (ferramentas.jsx),
@@ -61,6 +61,10 @@ export default function AdminUsuarios() {
   // clicar em Salvar.
   const [personalizandoId, setPersonalizandoId] = useState(null)
   const [selecaoFerramentas, setSelecaoFerramentas] = useState({})
+  // Checkbox extra "Acesso à aba Importar RDOs" (independente do
+  // checklist de ferramentas) — só faz sentido, e só é exibida, quando
+  // 'rdo' está marcado no checklist acima (ver salvarPersonalizacao).
+  const [selecaoImportarRdos, setSelecaoImportarRdos] = useState(false)
   const [salvandoPersonalizacao, setSalvandoPersonalizacao] = useState(false)
   const [erroPersonalizacao, setErroPersonalizacao] = useState(null)
 
@@ -172,12 +176,19 @@ export default function AdminUsuarios() {
     })
 
     setSelecaoFerramentas(selecaoInicial)
+    setSelecaoImportarRdos(Boolean(usuario.pode_importar_rdos))
     setErroPersonalizacao(null)
     setPersonalizandoId(usuario.id)
   }
 
   function alternarSelecaoFerramenta(chave) {
-    setSelecaoFerramentas((atual) => ({ ...atual, [chave]: !atual[chave] }))
+    setSelecaoFerramentas((atual) => {
+      const proxima = { ...atual, [chave]: !atual[chave] }
+      // Desmarcar 'rdo' esconde (e zera) o checkbox de Importar RDOs: não
+      // faz sentido manter essa permissão pra quem nem acessa a ferramenta.
+      if (chave === 'rdo' && !proxima.rdo) setSelecaoImportarRdos(false)
+      return proxima
+    })
   }
 
   async function salvarPersonalizacao(usuario) {
@@ -197,10 +208,13 @@ export default function AdminUsuarios() {
     // do array cheio, pra ferramentas criadas no futuro entrarem
     // automaticamente no acesso total desse usuário (ver temAcessoFerramenta).
     const valor = selecionadas.length === FERRAMENTAS_PERSONALIZAVEIS.length ? null : selecionadas
+    // Reforça a mesma regra na gravação: sem acesso a 'rdo', não grava
+    // pode_importar_rdos = true por engano.
+    const podeImportarRdosValor = Boolean(selecaoFerramentas.rdo && selecaoImportarRdos)
 
     const { data, error } = await supabase
       .from('perfis')
-      .update({ ferramentas_permitidas: valor })
+      .update({ ferramentas_permitidas: valor, pode_importar_rdos: podeImportarRdosValor })
       .eq('id', usuario.id)
       .select(SELECT_USUARIOS)
       .single()
@@ -402,6 +416,19 @@ export default function AdminUsuarios() {
                           </label>
                         ))}
                       </div>
+
+                      {selecaoFerramentas.rdo && (
+                        <label className="mt-3 flex items-center gap-2 border-t border-accent/20 pt-3 text-sm text-gray-700 dark:border-accent/20 dark:text-slate-300">
+                          <input
+                            type="checkbox"
+                            checked={selecaoImportarRdos}
+                            onChange={() => setSelecaoImportarRdos((atual) => !atual)}
+                            disabled={salvandoPersonalizacao}
+                            className="rounded border-gray-300 text-accent focus:ring-accent dark:border-slate-500 dark:bg-slate-700"
+                          />
+                          Acesso à aba Importar RDOs
+                        </label>
+                      )}
 
                       {erroPersonalizacao && <p className="mt-2 text-sm text-alert">{erroPersonalizacao}</p>}
 

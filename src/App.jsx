@@ -99,12 +99,12 @@ function App() {
               path="/input"
               element={
                 <AppLayout>
-                  <AdminRoute>
+                  <ProtectedRoute ferramenta="rdo" requerImportarRdos>
                     <>
                       <RdoToolNav />
                       <Input />
                     </>
-                  </AdminRoute>
+                  </ProtectedRoute>
                 </AppLayout>
               }
             />

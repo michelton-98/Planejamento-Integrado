@@ -152,3 +152,19 @@ export function temAcessoFerramenta(profile, chave) {
   if (!permitidas || permitidas.length === 0) return true
   return permitidas.includes(chave)
 }
+
+/**
+ * `true` se `profile` pode ver/usar a aba "Importar RDOs" (rota /input,
+ * dentro do Controle de RDO) — importação do relatório diário e cadastro
+ * de "Escopos - Rondonópolis". Mecanismo independente de
+ * ferramentas_permitidas/temAcessoFerramenta (ver migration 0015): ao
+ * contrário dele, o padrão AQUI é restrito — só admins têm acesso
+ * automático; usuários comuns só entram com `pode_importar_rdos = true`,
+ * ligado explicitamente pela conta master em "Personalizar Acesso"
+ * (AdminUsuarios.jsx). É só bloqueio de interface/rota — a permissão de
+ * escrita real (rdo_relatorios/obras_escopos) é reforçada em paralelo por
+ * RLS (public.pode_gerenciar_rdo_input()).
+ */
+export function podeImportarRdos(profile) {
+  return Boolean(profile?.is_admin || profile?.pode_importar_rdos)
+}

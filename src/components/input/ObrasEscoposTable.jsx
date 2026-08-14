@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../lib/AuthContext'
+import { podeImportarRdos } from '../../lib/ferramentas'
 import {
   DISCIPLINAS,
   atualizarObraEscopo,
@@ -102,10 +103,11 @@ export default function ObrasEscoposTable({ prefill, onPrefillConsumido, onMudan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill])
 
-  // Defesa em profundidade: /input já é uma rota AdminRoute, mas essa
-  // tabela editável não deve renderizar (nem tentar escrever) para quem
-  // não é admin.
-  if (!profile?.is_admin) return null
+  // Defesa em profundidade: /input já é uma rota protegida (ver
+  // ProtectedRoute ferramenta="rdo" requerImportarRdos em App.jsx), mas
+  // essa tabela editável não deve renderizar (nem tentar escrever) para
+  // quem não é admin nem tem pode_importar_rdos.
+  if (!podeImportarRdos(profile)) return null
 
   async function handleCampoChange(obra, campo, valor) {
     setSalvandoId(obra.id)
