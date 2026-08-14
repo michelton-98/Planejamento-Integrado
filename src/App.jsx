@@ -14,6 +14,8 @@ import Cadastro from './pages/Cadastro'
 import AguardandoAprovacao from './pages/AguardandoAprovacao'
 import Input from './pages/Input'
 import Validacoes from './pages/Validacoes'
+import AvancoIntegrado from './pages/AvancoIntegrado'
+import DestilariaFase1 from './pages/avanco/DestilariaFase1'
 import AdminUsuarios from './pages/admin/AdminUsuarios'
 
 // Chrome padrão do app (cabeçalho + fundo) — usado nas telas internas. As
@@ -114,6 +116,26 @@ function App() {
                 <AppLayout>
                   <ProtectedRoute ferramenta="validacoes">
                     <Validacoes />
+                  </ProtectedRoute>
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/avanco-integrado"
+              element={
+                <AppLayout>
+                  <ProtectedRoute ferramenta="avanco_integrado">
+                    <AvancoIntegrado />
+                  </ProtectedRoute>
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/avanco-integrado/destilaria-fase-1"
+              element={
+                <AppLayout>
+                  <ProtectedRoute ferramenta="avanco_integrado">
+                    <DestilariaFase1 />
                   </ProtectedRoute>
                 </AppLayout>
               }

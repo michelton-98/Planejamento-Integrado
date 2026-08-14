@@ -6,6 +6,8 @@ import {
 } from './dashboardData'
 import { fetchObrasEscopos } from './obrasEscoposData'
 import { supabase } from './supabaseClient'
+import { AVANCO_CONFIG, FASES_AVANCO } from './avancoIntegradoConfig'
+import { calcularAvancoPorEmpresa, fetchAvancoArquivos } from './avancoIntegradoData'
 import {
   agruparSemanaisPorEscopo,
   contarFinalizadasSemanaMaisRecente,
@@ -66,6 +68,32 @@ async function estatisticasValidacoes() {
   }
 }
 
+// Resumo do card "Avanço Integrado": total de arquivos já enviados +
+// cobertura média de envio (ver calcularAvancoPorEmpresa) entre as
+// empresas que já têm pelo menos 1 arquivo — só considera a Destilaria
+// Fase I por enquanto, a única fase/ferramenta de verdade habilitada
+// (ver FASES_AVANCO em avancoIntegradoConfig.js).
+async function estatisticasAvancoIntegrado() {
+  const fase = FASES_AVANCO[0].chave
+  const arquivos = await fetchAvancoArquivos(fase)
+
+  const indicadores = Object.entries(AVANCO_CONFIG[fase] ?? {}).flatMap(([disciplina, config]) =>
+    calcularAvancoPorEmpresa(
+      arquivos.filter((arquivo) => arquivo.disciplina === disciplina),
+      config.empresas ?? {},
+    ),
+  )
+  const comDados = indicadores.filter((indicador) => indicador.dataReferencia)
+  const coberturaMedia = comDados.length
+    ? Math.round(comDados.reduce((soma, indicador) => soma + indicador.percentual, 0) / comDados.length)
+    : 0
+
+  return {
+    colunas: [{ valor: arquivos.length, rotulo: 'Arquivos enviados' }],
+    barras: comDados.length ? [{ rotulo: 'Cobertura média de envio', percentual: coberturaMedia, cor: '#7c3aed' }] : [],
+  }
+}
+
 // Catálogo de ferramentas do Painel (tela inicial "/"). Cada entrada vira
 // um card — pra adicionar uma nova ferramenta no futuro basta acrescentar
 // um item aqui, sem tocar na tela do painel em si. `somenteAdmin` filtra
@@ -108,6 +136,25 @@ export const FERRAMENTAS = [
           strokeLinecap="round"
           strokeLinejoin="round"
           d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+        />
+      </svg>
+    ),
+  },
+  {
+    chave: 'avanco_integrado',
+    titulo: 'Avanço Integrado',
+    categoria: 'Obras · Avanço físico',
+    descricao: 'Envio de arquivos de avanço por disciplina/empresa e indicadores de cobertura, por fase da planta.',
+    href: '/avanco-integrado',
+    corFaixa: '#7c3aed',
+    somenteAdmin: false,
+    carregarEstatisticas: estatisticasAvancoIntegrado,
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-6 w-6">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3.75 19.5h16.5M6.75 19.5v-6M11.25 19.5v-9.75M15.75 19.5V6M20.25 19.5V9.75"
         />
       </svg>
     ),
