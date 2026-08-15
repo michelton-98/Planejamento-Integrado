@@ -64,10 +64,17 @@ function identificarIndicador(nomeTarefa) {
   return REGRAS_INDICADORES.find((regra) => regra.bate(normalizado))?.nome ?? null
 }
 
+// Sem valor (atributo ausente OU <Value> vazio) conta como 0%, não como
+// "sem dado" — no MS Project, quando o início real de uma atividade é
+// anterior à data prevista de início, a coluna "% previsto" mostra 0%, e é
+// assim que aparece no cronograma real (ver prompt que motivou este
+// comportamento). Só a AUSÊNCIA DA SEÇÃO/TAREFA em si (ver
+// encontrarResumoFase/extrairFase.faltantes) continua virando "sem dado" —
+// isso aqui é só sobre o VALOR NUMÉRICO de uma tarefa que já existe.
 function paraNumero(texto) {
-  if (texto === null || texto === undefined || texto === '') return null
+  if (texto === null || texto === undefined || texto === '') return 0
   const numero = Number(texto)
-  return Number.isFinite(numero) ? numero : null
+  return Number.isFinite(numero) ? numero : 0
 }
 
 // --- decodificação de entidades XML --------------------------------------
@@ -173,8 +180,12 @@ function lerTarefas(xmlTexto) {
 
   const tarefas = []
   for (const blocoTask of iterarBlocos(containerTarefas.conteudo, '<Task>', '</Task>')) {
-    let previsto = null
-    let executado = null
+    // Tarefa sem NENHUM ExtendedAttribute com esse FieldID (campo
+    // customizado nunca chegou a ser preenchido pra ela) também conta
+    // como 0%, mesma regra de paraNumero() acima pro caso de <Value>
+    // vazio.
+    let previsto = 0
+    let executado = 0
     // lerAtributosDoBloco aqui já fica restrito ao conteúdo DESSA
     // <Task> — como Task nunca é aninhada em Task (schema MSPDI), pega só
     // os ExtendedAttribute da própria tarefa.

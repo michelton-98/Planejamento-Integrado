@@ -229,12 +229,13 @@ function FormularioGenericoMetal({ empresa, escopos, arquivos, user, profile, on
   )
 }
 
-// Formulário de upload da FORTYS: só aceita .xml do MS Project (até
-// 150 MB), processado no navegador (Web Worker, ver fortysXmlWorkerClient
-// /fortysXmlParse.js) ANTES do envio pro Storage — o resultado da extração
-// (avanço geral + 6 indicadores, de Fase I e Fase II) é o que efetivamente
-// vira o payload de enviarArquivoFortysXml. Escopo é fixo (hoje só existe
-// "Prédio (Estrutura Principal)"): mostrado como texto, não como seletor.
+// Formulário da FORTYS: só aceita .xml do MS Project (até 150 MB),
+// processado inteiramente no navegador (Web Worker, ver
+// fortysXmlWorkerClient/fortysXmlParse.js) — o arquivo NUNCA é enviado ao
+// Storage, só lido em memória; só o resultado da extração (avanço geral +
+// 6 indicadores, de Fase I e Fase II) vira o payload de
+// enviarArquivoFortysXml. Escopo é fixo (hoje só existe "Prédio (Estrutura
+// Principal)"): mostrado como texto, não como seletor.
 function FormularioFortysXml({ empresa, escopos, arquivos, user, profile, onArquivoEnviado }) {
   const escopo = escopos[0] ?? ''
 

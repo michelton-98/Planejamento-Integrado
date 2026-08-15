@@ -182,7 +182,7 @@ export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo }
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {arquivo && (
+                      {arquivo?.storage_path ? (
                         <button
                           type="button"
                           onClick={() => handleBaixar(arquivo)}
@@ -192,6 +192,11 @@ export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo }
                           {baixandoEscopo === escopo && <Spinner className="h-3 w-3" />}
                           Baixar
                         </button>
+                      ) : (
+                        // Fluxo de cronograma (ver arquivoCronograma acima): não existe
+                        // arquivo pra baixar — o resumo já extraído (% geral + indicadores)
+                        // é o card "Avanço do cronograma" logo acima desta tabela.
+                        arquivo && <span className="text-xs text-gray-400 dark:text-slate-500">Ver resumo acima</span>
                       )}
                     </td>
                   </tr>

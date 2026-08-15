@@ -8,7 +8,7 @@ import { supabase } from './supabaseClient'
 
 export const BUCKET_AVANCO = 'avanco-arquivos'
 export const TAMANHO_MAXIMO_BYTES = 20 * 1024 * 1024 // 20 MB — upload genérico (QUALISOLDA)
-export const TAMANHO_MAXIMO_BYTES_FORTYS = 150 * 1024 * 1024 // 150 MB — cronograma .xml da FORTYS (arquivos reais passam de 90 MB)
+export const TAMANHO_MAXIMO_BYTES_FORTYS = 150 * 1024 * 1024 // 150 MB — cronograma .xml da FORTYS (arquivos reais passam de 90 MB); só limita a leitura em memória no Worker, o arquivo nunca é enviado ao Storage (ver enviarArquivoFortysXml)
 
 /** Busca todos os arquivos cadastrados de uma fase (todas as disciplinas/empresas/datas de uma vez). */
 export async function fetchAvancoArquivos(fase) {
@@ -130,15 +130,18 @@ export async function enviarArquivoAvanco({
 }
 
 /**
- * Envia o cronograma .xml da FORTYS: sobe o arquivo UMA ÚNICA VEZ pro
- * Storage e grava/atualiza DOIS registros em avanco_arquivos a partir dele
- * (mesmo storage_path nos dois) — um com fase 'destilaria_fase_1' e outro
- * com 'destilaria_fase_2' (ver migration 0016 pra fase/disciplina/empresa
- * sem check constraint — os dois valores de fase usados aqui não
- * precisam constar em nenhuma lista fixa do banco). `resultadoExtracao`
- * é o retorno de parseFortysXml (ver fortysXmlParse.js): `{ fase1, fase2 }`,
- * cada um com percentualPrevistoGeral/percentualExecutadoGeral +
- * indicadores[].
+ * Envia o cronograma .xml da FORTYS: NÃO sobe o arquivo pro Storage — ele
+ * nunca sai do navegador, só é lido em memória pelo Worker (ver
+ * fortysXmlParse.js) pra extrair os percentuais. Grava/atualiza DOIS
+ * registros em avanco_arquivos a partir do resultado da extração — um com
+ * fase 'destilaria_fase_1' e outro com 'destilaria_fase_2' (ver migration
+ * 0016 pra fase/disciplina/empresa sem check constraint) — ambos com
+ * `storage_path: null` (ver migration 0022, que tornou essa coluna
+ * nullable); `nome_arquivo`/`tamanho_bytes` continuam gravados, só como
+ * referência de qual arquivo original gerou aqueles números, nunca o
+ * conteúdo em si. `resultadoExtracao` é o retorno de parseFortysXml (ver
+ * fortysXmlParse.js): `{ fase1, fase2 }`, cada um com
+ * percentualPrevistoGeral/percentualExecutadoGeral + indicadores[].
  *
  * Ao contrário de enviarArquivoAvanco (genérico), aqui a checagem de
  * "já existe arquivo pra essa combinação" é feita NO BANCO, não a partir
@@ -165,14 +168,10 @@ export async function enviarArquivoFortysXml({ escopo, dataReferencia, arquivo, 
     fase2: existentes.find((registro) => registro.fase === 'destilaria_fase_2') ?? null,
   }
 
-  const storagePath = caminhoStorage({ fase: 'destilaria_fase_1', disciplina, empresa, escopo, dataReferencia, nomeArquivo: arquivo.name })
-  const { error: erroUpload } = await supabase.storage.from(BUCKET_AVANCO).upload(storagePath, arquivo)
-  if (erroUpload) throw erroUpload
-
   const dadosComuns = {
     nome_arquivo: arquivo.name,
     tamanho_bytes: arquivo.size,
-    storage_path: storagePath,
+    storage_path: null,
     enviado_por: user?.id ?? null,
     enviado_por_nome: profile?.nome || null,
     enviado_por_email: user?.email || null,
@@ -180,7 +179,6 @@ export async function enviarArquivoFortysXml({ escopo, dataReferencia, arquivo, 
 
   const registrosSalvos = {}
   const idsInseridosParaDesfazer = []
-  const storagePathsAntigos = new Set()
 
   try {
     for (const [chave, faseId] of [
@@ -200,7 +198,13 @@ export async function enviarArquivoFortysXml({ escopo, dataReferencia, arquivo, 
         const { data, error } = await supabase.from('avanco_arquivos').update(payload).eq('id', existente.id).select().single()
         if (error) throw error
         registro = data
-        if (existente.storage_path !== storagePath) storagePathsAntigos.add(existente.storage_path)
+
+        // Registro de antes desta mudança pode ter um storage_path de um
+        // upload que esse fluxo não faz mais — limpa o objeto órfão, se
+        // houver (best effort: falha aqui não derruba o envio).
+        if (existente.storage_path) {
+          await supabase.storage.from(BUCKET_AVANCO).remove([existente.storage_path])
+        }
 
         // Reenvio: apaga os indicadores antigos desse arquivo antes de
         // inserir os novos (ver requisito no prompt original).
@@ -233,19 +237,12 @@ export async function enviarArquivoFortysXml({ escopo, dataReferencia, arquivo, 
   } catch (err) {
     // Desfaz o que deu pra desfazer antes de propagar o erro: registros
     // recém-inseridos (updates a registros pré-existentes ficam como
-    // estavam, só sem indicadores novos) + o upload físico, pra não deixar
-    // um arquivo de ~90MB órfão no Storage.
+    // estavam, só sem indicadores novos — não há upload físico a desfazer
+    // nesse fluxo).
     if (idsInseridosParaDesfazer.length > 0) {
       await supabase.from('avanco_arquivos').delete().in('id', idsInseridosParaDesfazer)
     }
-    await supabase.storage.from(BUCKET_AVANCO).remove([storagePath])
     throw err
-  }
-
-  // Só remove o(s) arquivo(s) antigo(s) do Storage depois que os DOIS
-  // registros já foram confirmados no banco.
-  if (storagePathsAntigos.size > 0) {
-    await supabase.storage.from(BUCKET_AVANCO).remove([...storagePathsAntigos])
   }
 
   return registrosSalvos
