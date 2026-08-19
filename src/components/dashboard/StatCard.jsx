@@ -8,6 +8,7 @@ const CORES_TOM = {
   accent: '#2f6fed',
   alert: '#d1495b',
   success: '#178a54',
+  gold: '#a9791f',
 }
 
 const TEXTO_TOM = {
@@ -15,6 +16,7 @@ const TEXTO_TOM = {
   accent: 'text-accent',
   alert: 'text-alert',
   success: 'text-success',
+  gold: 'text-gold',
 }
 
 export default function StatCard({ label, value, tone = 'neutral' }) {

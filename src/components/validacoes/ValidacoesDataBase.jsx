@@ -511,23 +511,37 @@ export default function ValidacoesDataBase({
   onRemoverSemanal,
 }) {
   const [filtroTexto, setFiltroTexto] = useState('')
+  // '' = "Selecione o filtro desejado" (placeholder, sempre disponível pra
+  // voltar e limpar o filtro) — nesse estado mostra todos os escopos, sem
+  // filtrar por consideração.
+  const [filtroConsideracao, setFiltroConsideracao] = useState('')
   const [formEscopo, setFormEscopo] = useState(FORM_ESCOPO_VAZIO)
   const [criandoEscopo, setCriandoEscopo] = useState(false)
   const [erroFormEscopo, setErroFormEscopo] = useState(null)
 
   const escoposExibidos = useMemo(() => {
     const termo = filtroTexto.trim().toLowerCase()
-    const filtrados = !termo
+    const filtradosPorTexto = !termo
       ? escopos
       : escopos.filter((escopo) => {
           const campos = [escopo.numero_contrato, escopo.empresa, escopo.escopo, escopo.disciplina, escopo.status]
           return campos.some((valor) => (valor ?? '').toString().toLowerCase().includes(termo))
         })
+    // Consideração do registro mais recente (por data_recebimento — mesma
+    // ordenação usada no card de cada escopo, ver ordenarSemanaisPorDataRecebimento)
+    // — escopo sem nenhum registro nunca casa com um filtro selecionado.
+    const filtrados = !filtroConsideracao
+      ? filtradosPorTexto
+      : filtradosPorTexto.filter((escopo) => {
+          const semanais = semanaisPorEscopo.get(escopo.id) ?? []
+          const maisRecente = ordenarSemanaisPorDataRecebimento(semanais)[0]
+          return maisRecente?.consideracao === filtroConsideracao
+        })
     // Sempre A-Z por empresa, recalculado a cada render (não é ordenação
     // manual) — assim novos escopos entram no lugar certo automaticamente,
     // não importa a ordem de cadastro.
     return [...filtrados].sort((a, b) => a.empresa.localeCompare(b.empresa, 'pt-BR', { sensitivity: 'base' }))
-  }, [escopos, filtroTexto])
+  }, [escopos, filtroTexto, filtroConsideracao, semanaisPorEscopo])
 
   async function handleAdicionarEscopo(event) {
     event.preventDefault()
@@ -578,13 +592,27 @@ export default function ValidacoesDataBase({
         </form>
       </Card>
 
-      <input
-        type="text"
-        value={filtroTexto}
-        onChange={(event) => setFiltroTexto(event.target.value)}
-        placeholder="Buscar por contrato, empresa, escopo ou status..."
-        className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
-      />
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <input
+          type="text"
+          value={filtroTexto}
+          onChange={(event) => setFiltroTexto(event.target.value)}
+          placeholder="Buscar por contrato, empresa, escopo ou status..."
+          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
+        />
+        <select
+          value={filtroConsideracao}
+          onChange={(event) => setFiltroConsideracao(event.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]"
+        >
+          <option value="">Selecione o filtro desejado</option>
+          {CONSIDERACOES.map((item) => (
+            <option key={item.valor} value={item.valor}>
+              {item.valor}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {escoposExibidos.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-slate-400">

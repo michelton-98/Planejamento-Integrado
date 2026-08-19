@@ -27,6 +27,27 @@ function chaveArquivo(dataISO) {
   return dataISO
 }
 
+// Normaliza a capitalização do nome do escopo pra exibição no PDF ("EXECUÇÃO
+// DOS PRÉDIOS..." -> "Execução dos prédios...") — só transformação visual no
+// momento de montar o relatório, nunca toca o texto salvo em
+// validacoes_escopos.escopo.
+function capitalizarPrimeiraLetra(texto) {
+  if (!texto) return texto
+  return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase()
+}
+
+// Versão em minúsculas/sem acento de uma consideração, pra usar no nome do
+// arquivo do PDF filtrado por consideração (ex.: "Documentos não recebidos"
+// -> "documentos-nao-recebidos").
+function slugConsideracao(texto) {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
+
 // Altura ocupada por cada linha de texto quebrado dentro de uma célula —
 // um pouco mais que o tamanho da fonte, pra dar espaçamento (leading)
 // confortável entre linhas consecutivas.
@@ -124,7 +145,15 @@ function desenharLinhaComNegritoCT(doc, linha, x, yBase, fonteLinha, corHex) {
  * estranho quando colunas da mesma linha quebram em números diferentes de
  * linhas de texto.
  */
-function desenharTabela(doc, { x, y, colunas, linhas, fonteLinha = 8.5, alturaLinha = 16 }) {
+function desenharTabela(doc, {
+  x,
+  y,
+  colunas,
+  linhas,
+  fonteLinha = 8.5,
+  alturaLinha = 16,
+  textoVazio = 'Nenhum escopo ativo cadastrado.',
+}) {
   const larguraTotal = colunas.reduce((soma, coluna) => soma + coluna.largura, 0)
   const pageHeight = doc.internal.pageSize.getHeight()
   const alturaCabecalho = 18
@@ -158,7 +187,7 @@ function desenharTabela(doc, { x, y, colunas, linhas, fonteLinha = 8.5, alturaLi
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(...hexParaRgb(CORES.cinzaTexto))
-    doc.text('Nenhum escopo ativo cadastrado.', x + PADDING_CELULA_H, yAtual + 14)
+    doc.text(textoVazio, x + PADDING_CELULA_H, yAtual + 14)
     return yAtual + 24
   }
 
@@ -246,14 +275,22 @@ function desenharRodapeEmTodasPaginas(doc, textoReferencia) {
 }
 
 /**
- * Gera e baixa o PDF do relatório SEMANAL de validações: cabeçalho padrão,
- * cards de indicadores (mesma lógica de computeValidacoesStatsSemana já
- * usada no Dashboard), lista "Escopos por consideração" e a tabela
- * detalhada — uma linha por escopo ATIVO, com o registro de
- * data_recebimento exata na data de referência (ou "—"/"Sem registro" pros
- * que não têm lançamento nessa data).
+ * Gera e baixa o PDF do relatório SEMANAL de validações.
+ *
+ * Sem `consideracaoFiltro` (padrão, "Todas as Considerações" no painel):
+ * cabeçalho padrão, cards de indicadores (mesma lógica de
+ * computeValidacoesStatsSemana já usada no Dashboard), lista "Escopos por
+ * consideração" e a tabela detalhada — uma linha por escopo ATIVO, com o
+ * registro de data_recebimento exata na data de referência (ou
+ * "—"/"Sem registro" pros que não têm lançamento nessa data).
+ *
+ * Com `consideracaoFiltro` (uma das 6 opções fixas de CONSIDERACOES): sem
+ * indicadores nem quadro "Escopos por consideração" (não fazem sentido já
+ * filtrado por um único valor) — só a tabela Empresa/Escopo/Consideração
+ * dos escopos cuja consideração na data de referência é exatamente essa,
+ * com a coluna Escopo bem mais larga (sobraram só 3 colunas).
  */
-export async function gerarRelatorioValidacoesSemanalPdf({ dataReferencia, stats, detalhes }) {
+export async function gerarRelatorioValidacoesSemanalPdf({ dataReferencia, stats, detalhes, consideracaoFiltro = null }) {
   const logos = await carregarLogos()
 
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
@@ -264,58 +301,92 @@ export async function gerarRelatorioValidacoesSemanalPdf({ dataReferencia, stats
   let y = desenharCabecalho(doc, {
     logos,
     titulo: 'Controle de Validações',
-    subtitulo: `Relatório Semanal de Validações   ·   Data de referência: ${formatarDataISOBr(dataReferencia)}`,
+    subtitulo: consideracaoFiltro
+      ? `Relatório Semanal de Validações — ${consideracaoFiltro}   ·   Data de referência: ${formatarDataISOBr(dataReferencia)}`
+      : `Relatório Semanal de Validações   ·   Data de referência: ${formatarDataISOBr(dataReferencia)}`,
   })
 
-  const indicadores = [
-    { label: 'Escopos ativos', valor: stats.totalEscoposAtivos, cor: CORES.navy },
-    { label: 'Validação completa', valor: stats.completos, cor: CORES.success },
-    { label: 'Validação em Andamento', valor: stats.incompletos, cor: CORES.accent },
-    { label: 'Sem registro nesta data', valor: stats.semRegistro, cor: CORES.alert },
-  ]
-  const alturaCard = desenharCardsIndicadores(doc, MARGEM_X, y, larguraUtil, indicadores, { gap })
-  y += alturaCard + 26
+  if (!consideracaoFiltro) {
+    const indicadores = [
+      { label: 'Escopos ativos', valor: stats.totalEscoposAtivos, cor: CORES.navy },
+      { label: 'Validação completa', valor: stats.completos, cor: CORES.success },
+      { label: 'Validação em Andamento', valor: stats.incompletos, cor: CORES.accent },
+      { label: 'Sem registro nesta data', valor: stats.semRegistro, cor: CORES.alert },
+    ]
+    const alturaCard = desenharCardsIndicadores(doc, MARGEM_X, y, larguraUtil, indicadores, { gap })
+    y += alturaCard + 26
 
-  // --- Escopos por consideração -----------------------------------------
-  y = desenharTituloSecao(doc, MARGEM_X, y, 'Escopos por consideração')
-  const linhasConsideracao = [
-    ...stats.porConsideracao.map((item) => [item.valor, String(item.total)]),
-    ['Sem registro nesta data', String(stats.semRegistro)],
-  ]
-  y = desenharTabela(doc, {
-    x: MARGEM_X,
-    y,
-    colunas: [
-      { titulo: 'Consideração', largura: larguraUtil - 90 },
-      { titulo: 'Total', largura: 90, alinhar: 'right' },
-    ],
-    linhas: linhasConsideracao,
-  })
-  y += 26
+    // --- Escopos por consideração -----------------------------------------
+    y = desenharTituloSecao(doc, MARGEM_X, y, 'Escopos por consideração')
+    const linhasConsideracao = [
+      ...stats.porConsideracao.map((item) => [item.valor, String(item.total)]),
+      ['Sem registro nesta data', String(stats.semRegistro)],
+    ]
+    y = desenharTabela(doc, {
+      x: MARGEM_X,
+      y,
+      colunas: [
+        { titulo: 'Consideração', largura: larguraUtil - 90 },
+        { titulo: 'Total', largura: 90, alinhar: 'right' },
+      ],
+      linhas: linhasConsideracao,
+    })
+    y += 26
 
-  // --- Detalhamento por escopo --------------------------------------------
-  y = desenharTituloSecao(doc, MARGEM_X, y, 'Detalhamento por escopo')
-  const colunasDetalhe = [
-    { titulo: 'Empresa', largura: 115, negritoCT: true },
-    { titulo: 'Escopo', largura: 115 },
-    { titulo: 'Planejamento', largura: 68, alinhar: 'center', cor: corSimNao },
-    { titulo: 'Especialista', largura: 68, alinhar: 'center', cor: corSimNao },
-    { titulo: 'Sharepoint', largura: 68, alinhar: 'center', cor: corSimNao },
-    { titulo: 'Consideração', largura: larguraUtil - 115 - 115 - 68 * 3 },
-  ]
-  const linhasDetalhe = detalhes.map(({ escopo, registro }) => [
-    escopo.numero_contrato ? `${escopo.empresa} (CT ${escopo.numero_contrato})` : escopo.empresa,
-    escopo.escopo,
-    registro ? (registro.validado_planejamento ? 'Sim' : 'Não') : '—',
-    registro ? (registro.validado_especialista ? 'Sim' : 'Não') : '—',
-    registro ? (registro.sharepoint ? 'Sim' : 'Não') : '—',
-    registro ? registro.consideracao : 'Sem registro',
-  ])
-  desenharTabela(doc, { x: MARGEM_X, y, colunas: colunasDetalhe, linhas: linhasDetalhe })
+    // --- Detalhamento por escopo ------------------------------------------
+    y = desenharTituloSecao(doc, MARGEM_X, y, 'Detalhamento por escopo')
+    const colunasDetalhe = [
+      { titulo: 'Empresa', largura: 115, negritoCT: true },
+      { titulo: 'Escopo', largura: 115 },
+      { titulo: 'Planejamento', largura: 68, alinhar: 'center', cor: corSimNao },
+      { titulo: 'Especialista', largura: 68, alinhar: 'center', cor: corSimNao },
+      { titulo: 'Sharepoint', largura: 68, alinhar: 'center', cor: corSimNao },
+      { titulo: 'Consideração', largura: larguraUtil - 115 - 115 - 68 * 3 },
+    ]
+    const linhasDetalhe = detalhes.map(({ escopo, registro }) => [
+      escopo.numero_contrato ? `${escopo.empresa} (CT ${escopo.numero_contrato})` : escopo.empresa,
+      capitalizarPrimeiraLetra(escopo.escopo),
+      registro ? (registro.validado_planejamento ? 'Sim' : 'Não') : '—',
+      registro ? (registro.validado_especialista ? 'Sim' : 'Não') : '—',
+      registro ? (registro.sharepoint ? 'Sim' : 'Não') : '—',
+      registro ? registro.consideracao : 'Sem registro',
+    ])
+    desenharTabela(doc, { x: MARGEM_X, y, colunas: colunasDetalhe, linhas: linhasDetalhe })
+  } else {
+    // --- Filtrado por uma única consideração: só Empresa/Escopo/Consideração,
+    // com a coluna Escopo bem mais larga já que sobraram 3 colunas só —
+    // mesma lógica de altura dinâmica por linha de desenharTabela, então
+    // texto de escopo mais longo empurra a linha pra baixo em vez de
+    // cortar/sobrepor.
+    y = desenharTituloSecao(doc, MARGEM_X, y, 'Detalhamento por escopo')
+    const detalhesFiltrados = detalhes.filter(
+      ({ registro }) => registro && registro.consideracao === consideracaoFiltro,
+    )
+    const larguraEmpresa = 130
+    const larguraConsideracao = 140
+    const colunasDetalhe = [
+      { titulo: 'Empresa', largura: larguraEmpresa, negritoCT: true },
+      { titulo: 'Escopo', largura: larguraUtil - larguraEmpresa - larguraConsideracao },
+      { titulo: 'Consideração', largura: larguraConsideracao },
+    ]
+    const linhasDetalhe = detalhesFiltrados.map(({ escopo, registro }) => [
+      escopo.numero_contrato ? `${escopo.empresa} (CT ${escopo.numero_contrato})` : escopo.empresa,
+      capitalizarPrimeiraLetra(escopo.escopo),
+      registro.consideracao,
+    ])
+    desenharTabela(doc, {
+      x: MARGEM_X,
+      y,
+      colunas: colunasDetalhe,
+      linhas: linhasDetalhe,
+      textoVazio: 'Nenhum escopo com essa consideração nesta data.',
+    })
+  }
 
   desenharRodapeEmTodasPaginas(doc, `Referente à semana de ${formatarDataISOBr(dataReferencia)}`)
 
-  doc.save(`relatorio-validacoes-semanal-${chaveArquivo(dataReferencia)}.pdf`)
+  const sufixoArquivo = consideracaoFiltro ? `-${slugConsideracao(consideracaoFiltro)}` : ''
+  doc.save(`relatorio-validacoes-semanal-${chaveArquivo(dataReferencia)}${sufixoArquivo}.pdf`)
 }
 
 /**

@@ -150,6 +150,7 @@ export async function atualizarValidacaoSemanal(id, patch) {
  * marcado sozinho (sem Planejamento nem Especialista) cai no último caso.
  */
 export function statusValidacaoRegistro(registro) {
+  if (!registro) return 'Sem registro'
   if (registro.validado_planejamento && registro.validado_especialista && registro.sharepoint) {
     return 'Validação Concluída'
   }
@@ -346,6 +347,21 @@ export function listarEscoposPorConsideracaoSemana(escopos, semanaisPorEscopo, d
   }
 
   return resultado
+}
+
+/**
+ * Escopos ATIVOS sem NENHUM registro de validação na data_recebimento
+ * EXATA `dataReferencia` — usado pra expandir a linha "Sem registro nesta
+ * data" clicada em "Escopos por consideração" (modo Semanal do Dashboard),
+ * do mesmo jeito que listarEscoposPorConsideracaoSemana expande as demais
+ * linhas. Mesma regra de "data exata" de computeValidacoesStatsSemana.
+ */
+export function listarEscoposSemRegistroSemana(escopos, semanaisPorEscopo, dataReferencia) {
+  const escoposAtivos = escopos.filter((escopo) => escopo.status === 'Ativa')
+  return escoposAtivos.filter((escopo) => {
+    const registros = semanaisPorEscopo.get(escopo.id) ?? []
+    return !registros.some((item) => item.data_recebimento === dataReferencia)
+  })
 }
 
 /**

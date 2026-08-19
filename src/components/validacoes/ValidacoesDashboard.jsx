@@ -3,6 +3,7 @@ import {
   computeValidacoesMatrizMensal,
   computeValidacoesStatsSemana,
   listarEscoposPorConsideracaoSemana,
+  listarEscoposSemRegistroSemana,
   mesAtualISO,
   quartaFeiraMaisRecente,
   statusValidacaoRegistro,
@@ -30,6 +31,17 @@ function formatarDataBR(dataISO) {
   return `${dia}/${mes}`
 }
 
+// Sentinela pra "linha Sem registro nesta data" do quadro "Escopos por
+// consideração" — mesmo texto exibido na linha, usado como valor de
+// consideracaoSelecionada pra distinguir de um valor real de CONSIDERACOES
+// (nenhum dos 6 valores fixos é igual a esse texto).
+const SEM_REGISTRO_SENTINELA = 'Sem registro nesta data'
+
+/** Busca o total já calculado de `stats.porConsideracao` pra um valor específico. */
+function totalPorConsideracao(stats, valor) {
+  return stats.porConsideracao.find((item) => item.valor === valor)?.total ?? 0
+}
+
 function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
   const [consideracaoSelecionada, setConsideracaoSelecionada] = useState(null)
 
@@ -38,13 +50,16 @@ function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
     [escopos, semanaisPorEscopo, dataReferencia],
   )
 
-  const detalhes = useMemo(
-    () =>
-      consideracaoSelecionada
-        ? listarEscoposPorConsideracaoSemana(escopos, semanaisPorEscopo, dataReferencia, consideracaoSelecionada)
-        : [],
-    [escopos, semanaisPorEscopo, dataReferencia, consideracaoSelecionada],
-  )
+  const detalhes = useMemo(() => {
+    if (!consideracaoSelecionada) return []
+    if (consideracaoSelecionada === SEM_REGISTRO_SENTINELA) {
+      return listarEscoposSemRegistroSemana(escopos, semanaisPorEscopo, dataReferencia).map((escopo) => ({
+        escopo,
+        registro: null,
+      }))
+    }
+    return listarEscoposPorConsideracaoSemana(escopos, semanaisPorEscopo, dataReferencia, consideracaoSelecionada)
+  }, [escopos, semanaisPorEscopo, dataReferencia, consideracaoSelecionada])
 
   const maxConsideracao = Math.max(...stats.porConsideracao.map((item) => item.total), stats.semRegistro, 1)
 
@@ -52,13 +67,30 @@ function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
     setConsideracaoSelecionada((atual) => (atual === valor ? null : valor))
   }
 
+  const naoValidada =
+    totalPorConsideracao(stats, 'Não Validado Pelo Planejamento') +
+    totalPorConsideracao(stats, 'Não Validado Pelo Especialista')
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Escopos ativos" value={stats.totalEscoposAtivos} tone="neutral" />
-        <StatCard label="Validação completa" value={stats.completos} tone="success" />
-        <StatCard label="Validação em Andamento" value={stats.incompletos} tone="accent" />
-        <StatCard label="Sem registro nesta data" value={stats.semRegistro} tone="alert" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard label="Escopos Ativos" value={stats.totalEscoposAtivos} tone="neutral" />
+        <StatCard
+          label="Validações Finalizadas"
+          value={totalPorConsideracao(stats, 'Validação Finalizada')}
+          tone="success"
+        />
+        <StatCard
+          label="Validação em Andamento"
+          value={totalPorConsideracao(stats, 'Validação em Andamento')}
+          tone="accent"
+        />
+        <StatCard label="Não Validada" value={naoValidada} tone="alert" />
+        <StatCard
+          label="Escopos em Validação Inicial"
+          value={totalPorConsideracao(stats, 'Escopo em Validação Inicial')}
+          tone="gold"
+        />
       </div>
 
       <Card faixaCor="#2f6fed" categoria="Situação na data de referência" titulo="Escopos por consideração">
@@ -95,16 +127,27 @@ function DashboardSemanal({ escopos, semanaisPorEscopo, dataReferencia }) {
             )
           })}
           <li>
-            <div className="mb-1 flex items-center justify-between px-3 text-sm">
-              <span className="text-gray-500 dark:text-slate-400">Sem registro nesta data</span>
-              <span className="font-semibold text-navy dark:text-slate-100">{stats.semRegistro}</span>
-            </div>
-            <div className="mx-3 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
-              <div
-                className="h-full rounded-full bg-gray-400"
-                style={{ width: `${(stats.semRegistro / maxConsideracao) * 100}%` }}
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => handleClickConsideracao(SEM_REGISTRO_SENTINELA)}
+              aria-pressed={consideracaoSelecionada === SEM_REGISTRO_SENTINELA}
+              className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
+                consideracaoSelecionada === SEM_REGISTRO_SENTINELA
+                  ? 'border-accent bg-accent/10'
+                  : 'border-transparent hover:border-gray-200 hover:bg-gray-50 dark:hover:border-slate-600 dark:hover:bg-slate-700/50'
+              }`}
+            >
+              <div className="mb-1 flex items-center justify-between text-sm">
+                <span className="text-gray-500 dark:text-slate-400">Sem registro nesta data</span>
+                <span className="font-semibold text-navy dark:text-slate-100">{stats.semRegistro}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
+                <div
+                  className="h-full rounded-full bg-gray-400"
+                  style={{ width: `${(stats.semRegistro / maxConsideracao) * 100}%` }}
+                />
+              </div>
+            </button>
           </li>
         </ol>
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  CONSIDERACOES,
   computeValidacoesMatrizPeriodo,
   computeValidacoesStatsSemana,
   ehQuartaFeira,
@@ -24,6 +25,12 @@ const ANCORA_QUARTA = '2020-01-01'
 const CAMPO_DATA_CLASSE =
   'rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark] dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
 
+// Opção padrão do filtro "Consideração" do modo Semanal — com ela
+// selecionada o PDF sai igual ao relatório completo de sempre (indicadores
+// + quadro + tabela completa). Nenhum dos 6 valores fixos de CONSIDERACOES
+// é igual a este texto, então não há ambiguidade ao comparar.
+const TODAS_CONSIDERACOES = 'Todas as Considerações'
+
 /**
  * Slide-over "Emitir Relatório" da aba Data_Base do Controle de Validações:
  * alterna Semanal/Mensal (mesmo ToggleModo do Dashboard), coleta a(s)
@@ -34,6 +41,7 @@ const CAMPO_DATA_CLASSE =
 export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, aberto, onFechar }) {
   const [modo, setModo] = useState('semanal')
   const [dataReferencia, setDataReferencia] = useState(() => quartaFeiraMaisRecente())
+  const [consideracaoSemanal, setConsideracaoSemanal] = useState(TODAS_CONSIDERACOES)
   const [inicioPeriodo, setInicioPeriodo] = useState('')
   const [fimPeriodo, setFimPeriodo] = useState('')
   const [gerando, setGerando] = useState(false)
@@ -86,7 +94,8 @@ export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, 
       if (modo === 'semanal') {
         const stats = computeValidacoesStatsSemana(escopos, semanaisPorEscopo, dataReferencia)
         const detalhes = listarDetalheValidacaoSemana(escopos, semanaisPorEscopo, dataReferencia)
-        await gerarRelatorioValidacoesSemanalPdf({ dataReferencia, stats, detalhes })
+        const consideracaoFiltro = consideracaoSemanal === TODAS_CONSIDERACOES ? null : consideracaoSemanal
+        await gerarRelatorioValidacoesSemanalPdf({ dataReferencia, stats, detalhes, consideracaoFiltro })
       } else {
         const quartas = quartasNoIntervalo(inicioPeriodo, fimPeriodo)
         const { linhas } = computeValidacoesMatrizPeriodo(escopos, semanaisPorEscopo, quartas)
@@ -133,15 +142,33 @@ export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, 
           <ToggleModo modo={modo} onChange={setModo} />
 
           {modo === 'semanal' ? (
-            <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-slate-300">
-              Data de referência
-              <input
-                type="date"
-                value={dataReferencia}
-                onChange={(event) => setDataReferencia(event.target.value)}
-                className={CAMPO_DATA_CLASSE}
-              />
-            </label>
+            <div className="flex flex-col gap-4">
+              <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-slate-300">
+                Data de referência
+                <input
+                  type="date"
+                  value={dataReferencia}
+                  onChange={(event) => setDataReferencia(event.target.value)}
+                  className={CAMPO_DATA_CLASSE}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-slate-300">
+                Consideração
+                <select
+                  value={consideracaoSemanal}
+                  onChange={(event) => setConsideracaoSemanal(event.target.value)}
+                  className={CAMPO_DATA_CLASSE}
+                >
+                  <option value={TODAS_CONSIDERACOES}>{TODAS_CONSIDERACOES}</option>
+                  {CONSIDERACOES.map((item) => (
+                    <option key={item.valor} value={item.valor}>
+                      {item.valor}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           ) : (
             <div className="flex flex-col gap-4">
               <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-slate-300">
