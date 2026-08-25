@@ -16,6 +16,7 @@ import Input from './pages/Input'
 import Validacoes from './pages/Validacoes'
 import AvancoIntegrado from './pages/AvancoIntegrado'
 import DestilariaFase1 from './pages/avanco/DestilariaFase1'
+import Histograma from './pages/Histograma'
 import AdminUsuarios from './pages/admin/AdminUsuarios'
 
 // Chrome padrão do app (cabeçalho + fundo) — usado nas telas internas. As
@@ -136,6 +137,16 @@ function App() {
                 <AppLayout>
                   <ProtectedRoute ferramenta="avanco_integrado">
                     <DestilariaFase1 />
+                  </ProtectedRoute>
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/histograma"
+              element={
+                <AppLayout>
+                  <ProtectedRoute ferramenta="histograma">
+                    <Histograma />
                   </ProtectedRoute>
                 </AppLayout>
               }

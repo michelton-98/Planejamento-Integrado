@@ -23,6 +23,16 @@ const COR_CONSIDERACAO = {
   'Documentos não recebidos': '#d1495b',
 }
 
+// Classes do "chip" de cada célula da grade escopo × quarta-feira (modo
+// Mensal), por `tom` de estadoCelulaValidacao (validacoesData.js) — mesma
+// paleta semântica success/alert/accent do resto do app.
+const CLASSE_TOM_CELULA = {
+  success: 'bg-success/10 text-success',
+  alert: 'bg-alert/10 text-alert',
+  accent: 'bg-accent/10 text-accent',
+  neutro: 'bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-slate-500',
+}
+
 // Só dia/mês no cabeçalho da coluna — o ano já está implícito no seletor
 // "Mês de referência" logo acima da tabela.
 function formatarDataBR(dataISO) {
@@ -246,10 +256,10 @@ function DashboardMensal({ escopos, semanaisPorEscopo, mesReferencia }) {
                   <td key={celula.data} className="px-2 py-2 text-center">
                     <span
                       className={`inline-flex items-center justify-center rounded-full px-2 py-1 text-[11px] font-semibold leading-tight ${
-                        celula.validado ? 'bg-success/10 text-success' : 'bg-alert/10 text-alert'
+                        CLASSE_TOM_CELULA[celula.estado.tom] ?? CLASSE_TOM_CELULA.neutro
                       }`}
                     >
-                      {celula.validado ? 'Cronograma Validado' : 'Cronograma Não Validado / Reprovado'}
+                      {celula.estado.rotulo}
                     </span>
                   </td>
                 ))}

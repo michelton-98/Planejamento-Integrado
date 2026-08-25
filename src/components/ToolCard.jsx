@@ -21,12 +21,13 @@ export default function ToolCard({
   estatisticas,
   carregandoEstatisticas,
   atualizadoEm,
+  habilitada = true,
 }) {
-  return (
-    <Link
-      to={href}
-      className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-md shadow-gray-200/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-gray-300/60 dark:bg-slate-800 dark:shadow-black/30 dark:hover:shadow-black/50"
-    >
+  // Card "Em breve": mesmo padrão visual usado no sub-painel de fases do
+  // Avanço Integrado (ver QuadroFase em AvancoIntegrado.jsx) — opacidade
+  // reduzida, badge no canto, sem link/resumo, não clicável.
+  const conteudo = (
+    <>
       <div className="h-1.5" style={{ backgroundColor: corFaixa }} />
       <div className="flex flex-1 flex-col p-6">
         <div
@@ -85,13 +86,38 @@ export default function ToolCard({
           </div>
         ) : null}
 
-        <div className="mt-5 flex items-center gap-1 pt-4 text-xs font-semibold uppercase tracking-wider text-accent">
-          Abrir ferramenta
-          <span aria-hidden className="transition-transform group-hover:translate-x-0.5">
-            →
-          </span>
-        </div>
+        {habilitada && (
+          <div className="mt-5 flex items-center gap-1 pt-4 text-xs font-semibold uppercase tracking-wider text-accent">
+            Abrir ferramenta
+            <span aria-hidden className="transition-transform group-hover:translate-x-0.5">
+              →
+            </span>
+          </div>
+        )}
       </div>
+    </>
+  )
+
+  if (!habilitada) {
+    return (
+      <div
+        aria-disabled="true"
+        className="relative flex cursor-not-allowed flex-col overflow-hidden rounded-2xl bg-white opacity-50 shadow-md shadow-gray-200/70 dark:bg-slate-800 dark:shadow-black/30"
+      >
+        {conteudo}
+        <span className="absolute right-3 top-3 rounded-full bg-navy/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white dark:bg-slate-700">
+          Em breve
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      to={href}
+      className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-md shadow-gray-200/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-gray-300/60 dark:bg-slate-800 dark:shadow-black/30 dark:hover:shadow-black/50"
+    >
+      {conteudo}
     </Link>
   )
 }

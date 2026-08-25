@@ -389,13 +389,37 @@ export async function gerarRelatorioValidacoesSemanalPdf({ dataReferencia, stats
   doc.save(`relatorio-validacoes-semanal-${chaveArquivo(dataReferencia)}${sufixoArquivo}.pdf`)
 }
 
+// Cor de exibição de cada rótulo de célula da grade (ver
+// estadoCelulaValidacao em validacoesData.js) — usada tanto na coluna de
+// cada quarta-feira quanto poderia ser reaproveitada em outro relatório
+// que precise da mesma paleta.
+function corRotuloCelula(valor) {
+  if (valor === 'Validado (Sharepoint)' || valor === 'Validado') return CORES.success
+  if (valor === 'Não Validado' || valor === 'Não Entregue') return CORES.alert
+  if (valor === 'Em Validação Inicial' || valor === 'Validação em Andamento') return CORES.accent
+  if (valor === '—') return CORES.cinzaTexto
+  return CORES.navy
+}
+
 /**
  * Gera e baixa o PDF do relatório MENSAL de validações: cabeçalho padrão,
- * cards de indicadores agregados do período (ver resumoMatrizPeriodo) e a
- * mesma grade escopo × quarta-feira do Dashboard modo Mensal, formatada
- * pra impressão (fonte menor pra caber todas as colunas).
+ * os 4 cards de indicadores do período (Escopos Ativos, Cronogramas
+ * Validados, Não Validado/Reprovado, Escopos Concluídos/Paralisados — ver
+ * resumoMatrizPeriodo/contarConcluidosParalisados) e a mesma grade escopo ×
+ * quarta-feira do Dashboard modo Mensal, formatada pra impressão (fonte
+ * menor pra caber todas as colunas). Só escopos Ativos entram nas linhas
+ * (ver computeValidacoesMatrizPeriodo); Concluídos/Paralisados só contam no
+ * 4º card, independente do período do relatório.
  */
-export async function gerarRelatorioValidacoesMensalPdf({ inicioPeriodo, fimPeriodo, quartas, linhas, resumo }) {
+export async function gerarRelatorioValidacoesMensalPdf({
+  inicioPeriodo,
+  fimPeriodo,
+  quartas,
+  linhas,
+  resumo,
+  concluidos,
+  paralisados,
+}) {
   const logos = await carregarLogos()
 
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
@@ -410,10 +434,10 @@ export async function gerarRelatorioValidacoesMensalPdf({ inicioPeriodo, fimPeri
   })
 
   const indicadores = [
-    { label: 'Escopos ativos', valor: resumo.totalEscoposAtivos, cor: CORES.navy },
-    { label: 'Semanas no período', valor: quartas.length, cor: CORES.navy },
-    { label: 'Cronograma Validado', valor: resumo.validadas, cor: CORES.success },
-    { label: 'Não Validado / Reprovado', valor: resumo.naoValidadas, cor: CORES.alert },
+    { label: 'Escopos Ativos', valor: resumo.totalEscoposAtivos, cor: CORES.navy },
+    { label: 'Cronogramas Validados', valor: resumo.validados, cor: CORES.success },
+    { label: 'Não Validado / Reprovado', valor: resumo.naoValidados, cor: CORES.alert },
+    { label: 'Escopos Concluídos / Paralisados', valor: `${concluidos} / ${paralisados}`, cor: CORES.gold },
   ]
   const alturaCard = desenharCardsIndicadores(doc, MARGEM_X, y, larguraUtil, indicadores, { gap })
   y += alturaCard + 26
@@ -432,11 +456,11 @@ export async function gerarRelatorioValidacoesMensalPdf({ inicioPeriodo, fimPeri
       titulo: formatarDataISOBr(data).slice(0, 5), // DD/MM
       largura: larguraColunaData,
       alinhar: 'center',
-      // Sempre 1 linha só ("Validado"/"Não Validado"/"—") — centralizada
+      // Sempre 1 linha só (rótulo de estadoCelulaValidacao) — centralizada
       // verticalmente na altura real da linha (que agora varia conforme
       // o escopo quebra em mais ou menos linhas na coluna ao lado).
       alinharV: 'middle',
-      cor: (valor) => (valor === 'Validado' ? CORES.success : valor === '—' ? CORES.cinzaTexto : CORES.alert),
+      cor: corRotuloCelula,
     })),
   ]
   const linhasTabela = linhas.map(({ escopo, celulas }) => [
@@ -444,7 +468,7 @@ export async function gerarRelatorioValidacoesMensalPdf({ inicioPeriodo, fimPeri
       cabecalho: escopo.numero_contrato ? `${escopo.empresa} (CT ${escopo.numero_contrato}) —` : `${escopo.empresa} —`,
       corpo: escopo.escopo,
     },
-    ...celulas.map((celula) => (celula.registro ? (celula.validado ? 'Validado' : 'Não Validado') : '—')),
+    ...celulas.map((celula) => celula.estado.rotulo),
   ])
 
   desenharTabela(doc, {

@@ -117,23 +117,59 @@ export function desenharRodape(doc, textoReferencia, rotuloPagina) {
   doc.text(rotuloPagina, pageWidth - MARGEM_X, pageHeight - 20, { align: 'right' })
 }
 
+// Mesma constante de aproximação de arco por Bézier cúbica usada
+// internamente pelo roundedRect do próprio jsPDF (ver
+// node_modules/jspdf: API.roundedRect) — precisa ser igual pra a curva do
+// friso colorido casar exatamente com o canto arredondado do card cinza
+// por baixo dela.
+const ARCO_BEZIER = (4 / 3) * (Math.SQRT2 - 1)
+
+/**
+ * Retângulo preenchido com cantos arredondados SÓ em cima (raio `r`),
+ * base reta — usado pro friso colorido dos cards de indicador encostar
+ * exatamente na borda do card, com o mesmo arredondamento do canto cinza
+ * dele (ver desenharCardsIndicadores). O jsPDF só tem `roundedRect` com
+ * raio uniforme nos 4 cantos; aqui replicamos a mesma matemática de arco
+ * dele (ver ARCO_BEZIER) só nos 2 segmentos de cima, com os 2 de baixo
+ * como linha reta.
+ */
+function desenharRetanguloTopoArredondado(doc, x, y, w, h, r) {
+  doc.lines(
+    [
+      [w - 2 * r, 0],
+      [r * ARCO_BEZIER, 0, r, r - r * ARCO_BEZIER, r, r],
+      [0, h - r],
+      [-w, 0],
+      [0, -(h - r)],
+      [0, -(r * ARCO_BEZIER), r * ARCO_BEZIER, -r, r, -r],
+    ],
+    x + r,
+    y,
+    [1, 1],
+    'F',
+  )
+}
+
 /**
  * Fileira de cards de indicador (fundo cinza claro, friso colorido no
  * topo, rótulo + número grande) — mesmo visual dos StatCard da tela,
- * dividindo `largura` em partes iguais entre `indicadores`.
+ * dividindo `largura` em partes iguais entre `indicadores`. O friso vai de
+ * borda a borda do card (não some no canto arredondado: usa o mesmo raio
+ * do card por baixo, ver desenharRetanguloTopoArredondado).
  */
 export function desenharCardsIndicadores(doc, x, y, largura, indicadores, { gap = 12, alturaCard = 62 } = {}) {
   const larguraCard = (largura - gap * (indicadores.length - 1)) / indicadores.length
+  const raioCard = 4
+  const alturaFriso = 5
 
   indicadores.forEach((indicador, indice) => {
     const xCard = x + indice * (larguraCard + gap)
 
     doc.setFillColor(...hexParaRgb(CORES.cinzaClaro))
-    doc.roundedRect(xCard, y, larguraCard, alturaCard, 4, 4, 'F')
+    doc.roundedRect(xCard, y, larguraCard, alturaCard, raioCard, raioCard, 'F')
 
-    doc.setDrawColor(...hexParaRgb(indicador.cor))
-    doc.setLineWidth(2.5)
-    doc.line(xCard + 4, y + 1, xCard + larguraCard - 4, y + 1)
+    doc.setFillColor(...hexParaRgb(indicador.cor))
+    desenharRetanguloTopoArredondado(doc, xCard, y, larguraCard, alturaFriso, raioCard)
 
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8.5)

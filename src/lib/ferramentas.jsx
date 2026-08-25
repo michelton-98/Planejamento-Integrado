@@ -14,6 +14,7 @@ import {
   fetchTodasValidacoesSemanais,
   fetchValidacoesEscopos,
 } from './validacoesData'
+import { dataMaisRecente, fetchTodoHistograma, kpisGerais } from './histogramaData'
 
 // Resumo do card "Controle de RDO": total a aprovar + atrasadas, com uma
 // barra de "taxa de atraso" — mesmos números do topo do dashboard em
@@ -117,6 +118,24 @@ async function estatisticasAvancoIntegrado() {
   }
 }
 
+// Resumo do card "Histograma": Previsto/Realizado + barra de Índice de
+// Aderência Geral da data de referência mais recente cadastrada (mesmos
+// números do topo da aba Dashboard, ver kpisGerais em histogramaData.js).
+async function estatisticasHistograma() {
+  const linhas = await fetchTodoHistograma()
+  const maisRecente = dataMaisRecente(linhas)
+  const linhasDataMaisRecente = linhas.filter((linha) => linha.data_referencia === maisRecente)
+  const kpis = kpisGerais(linhasDataMaisRecente)
+
+  return {
+    colunas: [
+      { valor: kpis.previsto, rotulo: 'Previsto' },
+      { valor: kpis.realizado, rotulo: 'Realizado' },
+    ],
+    barras: maisRecente ? [{ rotulo: 'Aderência geral', percentual: kpis.aderencia, cor: '#0891b2' }] : [],
+  }
+}
+
 // Catálogo de ferramentas do Painel (tela inicial "/"). Cada entrada vira
 // um card — pra adicionar uma nova ferramenta no futuro basta acrescentar
 // um item aqui, sem tocar na tela do painel em si. `somenteAdmin` filtra
@@ -183,6 +202,25 @@ export const FERRAMENTAS = [
     ),
   },
   {
+    chave: 'histograma',
+    titulo: 'Histograma',
+    categoria: 'Obras · Mão de obra',
+    descricao: 'Efetivo de mão de obra por empresa/disciplina: Previsto x Realizado x Projeção, ao longo do tempo.',
+    href: '/histograma',
+    corFaixa: '#0891b2',
+    somenteAdmin: false,
+    carregarEstatisticas: estatisticasHistograma,
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-6 w-6">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4.5 19.5h15M7.5 19.5V10.5M12 19.5V6M16.5 19.5v-7.5"
+        />
+      </svg>
+    ),
+  },
+  {
     chave: 'usuarios',
     // 'usuarios' fica de fora do checklist de "Personalizar Acesso" (ver
     // AdminUsuarios.jsx) por causa de somenteAdmin: true — admins sempre
@@ -201,6 +239,37 @@ export const FERRAMENTAS = [
           strokeLinejoin="round"
           d="M15 19.5a4.5 4.5 0 0 0-9 0M18.75 19.5a4.125 4.125 0 0 0-3.132-4M10.5 11.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM17.25 11.25a3 3 0 0 0 2.906-3.75"
         />
+      </svg>
+    ),
+  },
+]
+
+/**
+ * Cards "Em breve" do Painel (ver ToolCard habilitada=false): ferramentas
+ * já anunciadas na interface mas ainda sem nenhuma funcionalidade por
+ * trás. De propósito FORA de FERRAMENTAS/temAcessoFerramenta — não têm
+ * rota nem dado nenhum pra proteger ainda, então não entram em
+ * "Personalizar Acesso" (AdminUsuarios.jsx); aparecem pra todo usuário
+ * aprovado, mesmo espírito das fases "Em breve" do Avanço Integrado (ver
+ * QuadroFase em AvancoIntegrado.jsx). Quando uma delas ganhar
+ * funcionalidade de verdade, ela migra pra FERRAMENTAS (com href/rota
+ * própria) e sai daqui.
+ */
+export const FERRAMENTAS_EM_BREVE = [
+  {
+    chave: 'grd',
+    titulo: 'GRD - Controle de Liberação de Projetos',
+    categoria: 'Obras · Documentação',
+    descricao: 'Controle de liberação de projetos por Guia de Remessa de Documentos (GRD).',
+    corFaixa: '#2f6fed',
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-6 w-6">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8.25 3.75h5.379a1.5 1.5 0 0 1 1.06.44l3.622 3.621a1.5 1.5 0 0 1 .439 1.061V19.5a1.5 1.5 0 0 1-1.5 1.5h-9a1.5 1.5 0 0 1-1.5-1.5V5.25a1.5 1.5 0 0 1 1.5-1.5Z"
+        />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 3.75V9h5.25M9 13.5h6M9 16.5h6" />
       </svg>
     ),
   },

@@ -3,6 +3,7 @@ import {
   CONSIDERACOES,
   computeValidacoesMatrizPeriodo,
   computeValidacoesStatsSemana,
+  contarConcluidosParalisados,
   ehQuartaFeira,
   fimMaximoPeriodoMensal,
   listarDetalheValidacaoSemana,
@@ -100,7 +101,16 @@ export default function RelatorioValidacoesPainel({ escopos, semanaisPorEscopo, 
         const quartas = quartasNoIntervalo(inicioPeriodo, fimPeriodo)
         const { linhas } = computeValidacoesMatrizPeriodo(escopos, semanaisPorEscopo, quartas)
         const resumo = resumoMatrizPeriodo(linhas)
-        await gerarRelatorioValidacoesMensalPdf({ inicioPeriodo, fimPeriodo, quartas, linhas, resumo })
+        const { concluidos, paralisados } = contarConcluidosParalisados(escopos)
+        await gerarRelatorioValidacoesMensalPdf({
+          inicioPeriodo,
+          fimPeriodo,
+          quartas,
+          linhas,
+          resumo,
+          concluidos,
+          paralisados,
+        })
       }
     } catch (err) {
       setErro(err.message || 'Não foi possível gerar o relatório.')

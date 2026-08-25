@@ -383,15 +383,67 @@ export function listarDetalheValidacaoSemana(escopos, semanaisPorEscopo, dataRef
     .sort((a, b) => a.escopo.empresa.localeCompare(b.escopo.empresa, 'pt-BR', { sensitivity: 'base' }))
 }
 
+// Rótulo/cor de cada célula da grade escopo × semana (Empresa/Disciplina ×
+// quarta-feira) — usado tanto pela matriz do modo Mensal (Dashboard e
+// relatório PDF) quanto, por consequência, por quem lê `celula.estado`.
+// Ordem de prioridade fixa (a primeira condição que bater vence):
+//   1. Planejamento + Especialista + Sharepoint marcados -> "Validado (Sharepoint)"
+//   2. Planejamento + Especialista marcados (sem Sharepoint) -> "Validado"
+//   3. Consideração "Não Validado Pelo Planejamento"/"...Especialista" -> "Não Validado"
+//   4. Consideração "Escopo em Validação Inicial" -> "Em Validação Inicial"
+//   5. Consideração "Documentos não recebidos" -> "Não Entregue"
+//   6. Consideração "Validação em Andamento" -> "Validação em Andamento"
+//   7. Sem nenhum registro na semana -> "—"
+// `chave` é o identificador estável usado pra colorir (PDF e tela); `rotulo`
+// é o texto exibido. `tom` reaproveita a mesma paleta semântica do resto do
+// app (success/alert/accent/neutro) — "Não Entregue" reaproveita o mesmo
+// tom (alert) de "Documentos não recebidos" em COR_CONSIDERACAO
+// (ValidacoesDashboard.jsx), "Validação em Andamento" o mesmo tom (accent)
+// do StatCard homônimo em DashboardSemanal.
+export function estadoCelulaValidacao(registro) {
+  if (!registro) return { chave: 'sem_registro', rotulo: '—', tom: 'neutro' }
+
+  const doisEtapas = registro.validado_planejamento && registro.validado_especialista
+  if (doisEtapas && registro.sharepoint) {
+    return { chave: 'validado_sharepoint', rotulo: 'Validado (Sharepoint)', tom: 'success' }
+  }
+  if (doisEtapas) {
+    return { chave: 'validado', rotulo: 'Validado', tom: 'success' }
+  }
+  if (
+    registro.consideracao === 'Não Validado Pelo Planejamento' ||
+    registro.consideracao === 'Não Validado Pelo Especialista'
+  ) {
+    return { chave: 'nao_validado', rotulo: 'Não Validado', tom: 'alert' }
+  }
+  if (registro.consideracao === 'Escopo em Validação Inicial') {
+    return { chave: 'em_validacao_inicial', rotulo: 'Em Validação Inicial', tom: 'accent' }
+  }
+  if (registro.consideracao === 'Documentos não recebidos') {
+    return { chave: 'nao_entregue', rotulo: 'Não Entregue', tom: 'alert' }
+  }
+  if (registro.consideracao === 'Validação em Andamento') {
+    return { chave: 'validacao_andamento', rotulo: 'Validação em Andamento', tom: 'accent' }
+  }
+  // Combinação "de fora do padrão" (ex.: consideração 'Validação
+  // Finalizada' sem os 2 checkboxes marcados) — não prevista nas 6 regras
+  // acima; mostra o texto cru da consideração num tom neutro em vez de
+  // some-la, pra não esconder um dado real de uma inconsistência de digitação.
+  return { chave: 'outro', rotulo: registro.consideracao, tom: 'neutro' }
+}
+
 /**
  * Matriz genérica: uma linha por escopo ATIVO, uma coluna por cada data de
- * `quartas` ('YYYY-MM-DD'). Cada célula é "validado" (Cronograma Validado)
- * só se existir um registro pra aquele escopo com data_recebimento
- * EXATAMENTE naquela data E com os 3 checkboxes marcados; qualquer outro
- * caso (sem registro, ou registro com checkbox faltando) é "Cronograma Não
- * Validado / Reprovado". Base tanto do modo Mensal do Dashboard (mês
+ * `quartas` ('YYYY-MM-DD'), cada célula com o estado calculado por
+ * estadoCelulaValidacao. Base tanto do modo Mensal do Dashboard (mês
  * inteiro, ver computeValidacoesMatrizMensal) quanto do período livre do
  * relatório PDF mensal (até 5 quartas-feiras, ver quartasNoIntervalo).
+ *
+ * Ordenação das linhas: alfabética por empresa (já garantida por `escopos`
+ * vir ordenado, ver fetchValidacoesEscopos), exceto que um escopo cuja
+ * ÚLTIMA data preenchida (não "—") do período estiver em "Em Validação
+ * Inicial" vai pro final da tabela — mantendo a ordem alfabética dentro de
+ * cada um dos dois grupos.
  */
 export function computeValidacoesMatrizPeriodo(escopos, semanaisPorEscopo, quartas) {
   const escoposAtivos = escopos.filter((escopo) => escopo.status === 'Ativa')
@@ -399,16 +451,22 @@ export function computeValidacoesMatrizPeriodo(escopos, semanaisPorEscopo, quart
   const linhas = escoposAtivos.map((escopo) => {
     const registros = semanaisPorEscopo.get(escopo.id) ?? []
     const celulas = quartas.map((data) => {
-      const registro = registros.find((item) => item.data_recebimento === data)
-      const validado = Boolean(
-        registro && registro.validado_planejamento && registro.validado_especialista && registro.sharepoint,
-      )
-      return { data, validado, registro: registro ?? null }
+      const registro = registros.find((item) => item.data_recebimento === data) ?? null
+      return { data, registro, estado: estadoCelulaValidacao(registro) }
     })
     return { escopo, celulas }
   })
 
-  return { quartas, linhas }
+  const linhasOrdenadas = linhas
+    .map((linha, indiceOriginal) => {
+      const ultimaPreenchida = [...linha.celulas].reverse().find((celula) => celula.estado.chave !== 'sem_registro')
+      const grupo = ultimaPreenchida?.estado.chave === 'em_validacao_inicial' ? 1 : 0
+      return { linha, grupo, indiceOriginal }
+    })
+    .sort((a, b) => a.grupo - b.grupo || a.indiceOriginal - b.indiceOriginal)
+    .map((item) => item.linha)
+
+  return { quartas, linhas: linhasOrdenadas }
 }
 
 /** Matriz pra aba Dashboard — modo Mensal: todas as quartas-feiras do mês `mesISO` ('YYYY-MM'). */
@@ -418,18 +476,37 @@ export function computeValidacoesMatrizMensal(escopos, semanaisPorEscopo, mesISO
 
 /**
  * Indicadores agregados a partir de uma matriz já calculada (ver
- * computeValidacoesMatrizPeriodo) — total de escopos ativos e contagem de
- * células validadas/não validadas somando todas as semanas do período.
- * Usado nos cards resumo do relatório PDF mensal.
+ * computeValidacoesMatrizPeriodo) pros 2 primeiros dos 4 cards do
+ * relatório PDF mensal: total de escopos ativos e contagem de células
+ * "Cronograma Validado" ("Validado"/"Validado (Sharepoint)") vs. "Não
+ * Validado" (só a consideração de reprovação — semanas sem nenhum
+ * registro NÃO contam aqui, ver estadoCelulaValidacao) somando todas as
+ * semanas do período.
  */
 export function resumoMatrizPeriodo(linhas) {
-  let validadas = 0
-  let naoValidadas = 0
+  let validados = 0
+  let naoValidados = 0
   for (const { celulas } of linhas) {
-    for (const celula of celulas) {
-      if (celula.validado) validadas += 1
-      else naoValidadas += 1
+    for (const { estado } of celulas) {
+      if (estado.chave === 'validado_sharepoint' || estado.chave === 'validado') validados += 1
+      else if (estado.chave === 'nao_validado') naoValidados += 1
     }
   }
-  return { totalEscoposAtivos: linhas.length, validadas, naoValidadas }
+  return { totalEscoposAtivos: linhas.length, validados, naoValidados }
+}
+
+/**
+ * Quantos escopos têm status "Concluída" e quantos têm "Paralisada" —
+ * conta TODOS os escopos com esses status, sem filtro de período (esses
+ * escopos não aparecem nas linhas da matriz/tabela, só nesse contador
+ * informativo do 4º card do relatório PDF mensal).
+ */
+export function contarConcluidosParalisados(escopos) {
+  let concluidos = 0
+  let paralisados = 0
+  for (const escopo of escopos) {
+    if (escopo.status === 'Concluída') concluidos += 1
+    else if (escopo.status === 'Paralisada') paralisados += 1
+  }
+  return { concluidos, paralisados }
 }

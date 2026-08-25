@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import ToolCard from '../components/ToolCard'
-import { FERRAMENTAS, temAcessoFerramenta } from '../lib/ferramentas'
+import { FERRAMENTAS, FERRAMENTAS_EM_BREVE, temAcessoFerramenta } from '../lib/ferramentas'
 
 // "Michel Guimarães Ribeiro" -> "MG" (primeira letra do primeiro e do
 // último nome); sem nome cadastrado, cai pra primeira letra do e-mail.
@@ -132,6 +132,9 @@ export default function Home() {
               carregandoEstatisticas={resumos[ferramenta.chave]?.carregando}
               atualizadoEm={resumos[ferramenta.chave]?.atualizadoEm}
             />
+          ))}
+          {FERRAMENTAS_EM_BREVE.map((ferramenta) => (
+            <ToolCard key={ferramenta.chave} {...ferramenta} habilitada={false} />
           ))}
         </div>
       </div>
