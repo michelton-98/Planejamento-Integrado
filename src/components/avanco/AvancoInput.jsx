@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { AVANCO_CONFIG, DISCIPLINAS_AVANCO } from '../../lib/avancoIntegradoConfig'
+import { AVANCO_CONFIG, DISCIPLINAS_AVANCO, ESCOPO_TIPO_QUALISOLDA } from '../../lib/avancoIntegradoConfig'
 import {
   TAMANHO_MAXIMO_BYTES,
   TAMANHO_MAXIMO_BYTES_FORTYS,
   enviarArquivoAvanco,
   enviarArquivoFortysXml,
+  enviarArquivoQualisoldaXlsx,
 } from '../../lib/avancoIntegradoData'
 import { processarXmlFortys } from '../../lib/fortysXmlWorkerClient'
+import { processarXlsxQualisolda } from '../../lib/qualisoldaXlsxWorkerClient'
 import Card from '../Card'
 import Spinner from '../Spinner'
 import { formatarPercentualIndicador } from './TabelaIndicadoresFortys'
@@ -429,6 +431,227 @@ function FormularioFortysXml({ empresa, escopos, arquivos, user, profile, onArqu
   )
 }
 
+// Formulário da QUALISOLDA: só aceita .xlsx (até 20 MB), processado
+// inteiramente no navegador (Web Worker, ver
+// qualisoldaXlsxWorkerClient.js/qualisoldaXlsxParse.js) — o arquivo NUNCA é
+// enviado ao Storage, só lido em memória; só o resultado da extração
+// (itens de tubulação/suportes + equipamentos, quando o escopo for Inox)
+// vira o payload de enviarArquivoQualisoldaXlsx. Ao contrário da FORTYS
+// (escopo fixo), aqui cada um dos 2 escopos é um arquivo/planilha
+// diferente (ver ESCOPO_TIPO_QUALISOLDA) — o escopo precisa ser escolhido
+// ANTES do arquivo, pra saber qual parser rodar.
+function FormularioQualisoldaXlsx({ empresa, escopos, arquivos, user, profile, onArquivoEnviado }) {
+  const [escopo, setEscopo] = useState('')
+  const [dataReferencia, setDataReferencia] = useState('')
+  const [arquivo, setArquivo] = useState(null)
+  const [inputKey, setInputKey] = useState(0)
+  const [processando, setProcessando] = useState(false)
+  const [resultadoExtracao, setResultadoExtracao] = useState(null)
+  const [pendenteSubstituicao, setPendenteSubstituicao] = useState(null)
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState(null)
+  const [sucesso, setSucesso] = useState(null)
+
+  function handleEscopoChange(event) {
+    setEscopo(event.target.value)
+    // Escopo decide qual parser roda (ver ESCOPO_TIPO_QUALISOLDA) — trocar
+    // de escopo invalida qualquer arquivo/extração já feita.
+    setErro(null)
+    setSucesso(null)
+    setArquivo(null)
+    setResultadoExtracao(null)
+    setInputKey((atual) => atual + 1)
+  }
+
+  async function processarArquivo(selecionado, escopoAtual) {
+    setProcessando(true)
+    setErro(null)
+    setResultadoExtracao(null)
+    try {
+      const resultado = await processarXlsxQualisolda(selecionado, ESCOPO_TIPO_QUALISOLDA[escopoAtual])
+      setResultadoExtracao(resultado)
+    } catch (err) {
+      setErro(err.message)
+    } finally {
+      setProcessando(false)
+    }
+  }
+
+  function handleArquivoChange(event) {
+    const selecionado = event.target.files?.[0] ?? null
+    setErro(null)
+    setSucesso(null)
+    setResultadoExtracao(null)
+    setArquivo(null)
+    if (!selecionado) return
+
+    if (!escopo) {
+      setErro('Selecione o escopo antes de escolher o arquivo.')
+      return
+    }
+    if (!selecionado.name.toLowerCase().endsWith('.xlsx')) {
+      setErro('Selecione um arquivo .xlsx.')
+      return
+    }
+    if (selecionado.size > TAMANHO_MAXIMO_BYTES) {
+      setErro('Arquivo maior que 20 MB. Escolha um arquivo menor.')
+      return
+    }
+
+    setArquivo(selecionado)
+    processarArquivo(selecionado, escopo)
+  }
+
+  function limparFormularioParcial() {
+    // Mantém Data e Escopo (é comum enviar os 2 escopos seguidos pra mesma
+    // data) — só limpa o arquivo selecionado.
+    setArquivo(null)
+    setResultadoExtracao(null)
+    setInputKey((atual) => atual + 1)
+  }
+
+  async function efetivarEnvio(registroExistente) {
+    setEnviando(true)
+    setErro(null)
+    try {
+      const registro = await enviarArquivoQualisoldaXlsx({
+        escopo,
+        dataReferencia,
+        arquivo,
+        resultadoExtracao,
+        registroExistente,
+        user,
+        profile,
+      })
+      onArquivoEnviado(registro)
+      setSucesso(`Arquivo enviado para ${empresa} — ${escopo} (${formatarDataBR(dataReferencia)}).`)
+      limparFormularioParcial()
+    } catch (err) {
+      setErro(err.message)
+    } finally {
+      setEnviando(false)
+      setPendenteSubstituicao(null)
+    }
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    setSucesso(null)
+    setErro(null)
+
+    if (!escopo || !dataReferencia) {
+      setErro('Preencha escopo e data antes de enviar.')
+      return
+    }
+    if (!arquivo || !resultadoExtracao) {
+      setErro('Selecione um arquivo .xlsx válido e aguarde a leitura da planilha.')
+      return
+    }
+
+    const existente = arquivos.find(
+      (item) => item.disciplina === 'Metal' && item.empresa === empresa && item.escopo === escopo && item.data_referencia === dataReferencia,
+    )
+
+    if (existente) {
+      setPendenteSubstituicao({ empresa, escopo, dataReferencia, existente })
+      return
+    }
+
+    efetivarEnvio(null)
+  }
+
+  const ehInox = ESCOPO_TIPO_QUALISOLDA[escopo] === 'inox'
+
+  return (
+    <>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <select value={escopo} onChange={handleEscopoChange} className={CLASSE_CAMPO}>
+            <option value="">Selecione o escopo</option>
+            {escopos.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="date"
+            value={dataReferencia}
+            onChange={(event) => setDataReferencia(event.target.value)}
+            className={CLASSE_CAMPO}
+          />
+
+          <input
+            key={inputKey}
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={handleArquivoChange}
+            disabled={!escopo}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 file:mr-3 file:rounded file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-accent/90 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+          />
+        </div>
+
+        <p className="text-xs text-gray-400 dark:text-slate-500">Somente arquivo .xlsx, até 20 MB.</p>
+
+        {arquivo && (
+          <div className="rounded-lg border border-dashed border-gray-300 p-3 text-sm dark:border-slate-600">
+            <p className="font-medium text-navy dark:text-slate-100">
+              {arquivo.name} <span className="text-xs text-gray-400 dark:text-slate-500">({formatarTamanho(arquivo.size)})</span>
+            </p>
+
+            {processando && (
+              <p className="mt-2 flex items-center gap-2 text-gray-500 dark:text-slate-400">
+                <Spinner className="h-3.5 w-3.5" /> Lendo planilha...
+              </p>
+            )}
+
+            {resultadoExtracao && !processando && (
+              <div className="mt-2 flex flex-col gap-1 text-xs text-gray-600 dark:text-slate-300">
+                <p>
+                  <span className="font-medium text-navy dark:text-slate-100">% Avanço geral:</span>{' '}
+                  {formatarPercentualIndicador(resultadoExtracao.percentualExecutadoGeral)} ·{' '}
+                  {resultadoExtracao.itensTubulacao.length} itens (isométricos + Suportes)
+                </p>
+                {ehInox && (
+                  <p>
+                    <span className="font-medium text-navy dark:text-slate-100">% Avanço Equipamentos:</span>{' '}
+                    {formatarPercentualIndicador(resultadoExtracao.percentualEquipamentosGeral)} ·{' '}
+                    {resultadoExtracao.equipamentos.length} equipamentos
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {erro && <p className="text-sm text-alert">{erro}</p>}
+        {sucesso && <p className="text-sm text-success">{sucesso}</p>}
+
+        <div>
+          <button
+            type="submit"
+            disabled={enviando || processando || !resultadoExtracao}
+            className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+          >
+            {enviando && <Spinner className="h-4 w-4 text-white" />}
+            {enviando ? 'Enviando...' : 'Enviar arquivo'}
+          </button>
+        </div>
+      </form>
+
+      {pendenteSubstituicao && (
+        <ConfirmarSubstituicao
+          pendente={pendenteSubstituicao}
+          substituindo={enviando}
+          onCancelar={() => setPendenteSubstituicao(null)}
+          onConfirmar={() => efetivarEnvio(pendenteSubstituicao.existente)}
+        />
+      )}
+    </>
+  )
+}
+
 // Seletor de Empresa + formulário certo pro tipo de input dela (ver
 // AVANCO_CONFIG). `key={empresa}` nos formulários reseta todo o estado
 // interno (campos, arquivo, resultado da extração) sozinho ao trocar de
@@ -452,6 +675,16 @@ function InputMetal({ fase, arquivos, user, profile, onArquivoEnviado }) {
 
       {configEmpresa?.tipoInput === 'xml_ms_project' ? (
         <FormularioFortysXml
+          key={empresa}
+          empresa={empresa}
+          escopos={configEmpresa.escopos}
+          arquivos={arquivos}
+          user={user}
+          profile={profile}
+          onArquivoEnviado={onArquivoEnviado}
+        />
+      ) : configEmpresa?.tipoInput === 'xlsx_qualisolda' ? (
+        <FormularioQualisoldaXlsx
           key={empresa}
           empresa={empresa}
           escopos={configEmpresa.escopos}

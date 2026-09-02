@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { AVANCO_CONFIG, DISCIPLINAS_AVANCO } from '../../lib/avancoIntegradoConfig'
+import { AVANCO_CONFIG, DISCIPLINAS_AVANCO, ESCOPO_TIPO_QUALISOLDA } from '../../lib/avancoIntegradoConfig'
 import { calcularAvancoPorEmpresa } from '../../lib/avancoIntegradoData'
 import Card from '../Card'
 import Spinner from '../Spinner'
@@ -92,6 +92,84 @@ function IndicadorCronogramaFortys({ disciplina, empresa, arquivosEmpresa, indic
   )
 }
 
+// Indicador da QUALISOLDA (tipoInput 'xlsx_qualisolda'): só os agregados
+// dos 2 escopos (Dashboard não lista item a item, ver PARTE 3 do prompt
+// original) — % avanço geral de Carbono, % avanço geral de Inox (tubulação
+// + suportes) e % avanço de Equipamentos à parte, cada um lido do arquivo
+// mais recente DAQUELE escopo (Carbono e Inox chegam em arquivos/datas
+// separados, ver ESCOPO_TIPO_QUALISOLDA).
+function StatTile({ rotulo, valor, destaque }) {
+  return (
+    <div className="flex-1 rounded-lg bg-gray-50 p-3 text-center dark:bg-slate-700/40">
+      <p className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-slate-500">{rotulo}</p>
+      <p className={`text-2xl font-semibold ${destaque ? 'text-accent' : 'text-navy dark:text-slate-100'}`}>{valor}</p>
+    </div>
+  )
+}
+
+function maisRecente(lista) {
+  if (lista.length === 0) return null
+  return lista.reduce((atual, item) => (item.data_referencia > atual.data_referencia ? item : atual))
+}
+
+function IndicadorQualisoldaXlsx({ disciplina, empresa, arquivosEmpresa }) {
+  const arquivoCarbono = useMemo(
+    () => maisRecente(arquivosEmpresa.filter((item) => ESCOPO_TIPO_QUALISOLDA[item.escopo] === 'carbono')),
+    [arquivosEmpresa],
+  )
+  const arquivoInox = useMemo(
+    () => maisRecente(arquivosEmpresa.filter((item) => ESCOPO_TIPO_QUALISOLDA[item.escopo] === 'inox')),
+    [arquivosEmpresa],
+  )
+
+  if (!arquivoCarbono && !arquivoInox) {
+    return (
+      <Card faixaCor="#7c3aed" categoria={`${disciplina} · ${empresa}`} titulo="Avanço por Escopo">
+        <p className="text-sm text-gray-500 dark:text-slate-400">Nenhum arquivo enviado ainda.</p>
+      </Card>
+    )
+  }
+
+  return (
+    <Card faixaCor="#7c3aed" categoria={`${disciplina} · ${empresa}`} titulo="Avanço por Escopo">
+      <div className="flex flex-col gap-4">
+        <div>
+          <p className="mb-2 text-xs font-medium text-gray-500 dark:text-slate-400">
+            Interligação de Carbono
+            {arquivoCarbono && <> · ref. {formatarDataBR(arquivoCarbono.data_referencia)}</>}
+          </p>
+          <div className="flex gap-3">
+            <StatTile
+              rotulo="% Avanço geral"
+              valor={arquivoCarbono ? formatarPercentualIndicador(arquivoCarbono.percentual_executado_geral) : '—'}
+              destaque
+            />
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-medium text-gray-500 dark:text-slate-400">
+            Interligação de Inox e Equipamentos
+            {arquivoInox && <> · ref. {formatarDataBR(arquivoInox.data_referencia)}</>}
+          </p>
+          <div className="flex gap-3">
+            <StatTile
+              rotulo="% Avanço geral (Tub. + Suportes)"
+              valor={arquivoInox ? formatarPercentualIndicador(arquivoInox.percentual_executado_geral) : '—'}
+              destaque
+            />
+            <StatTile
+              rotulo="% Avanço Equipamentos"
+              valor={arquivoInox ? formatarPercentualIndicador(arquivoInox.percentual_equipamentos_geral) : '—'}
+              destaque
+            />
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 function BlocoDisciplina({ fase, disciplina, arquivos, indicadoresPorArquivo }) {
   const arquivosDisciplina = useMemo(
     () => arquivos.filter((arquivo) => arquivo.disciplina === disciplina),
@@ -120,6 +198,8 @@ function BlocoDisciplina({ fase, disciplina, arquivos, indicadoresPorArquivo }) 
             arquivosEmpresa={arquivosEmpresa}
             indicadoresPorArquivo={indicadoresPorArquivo}
           />
+        ) : configEmpresa.tipoInput === 'xlsx_qualisolda' ? (
+          <IndicadorQualisoldaXlsx key={empresa} disciplina={disciplina} empresa={empresa} arquivosEmpresa={arquivosEmpresa} />
         ) : (
           <IndicadorCoberturaEnvio
             key={empresa}

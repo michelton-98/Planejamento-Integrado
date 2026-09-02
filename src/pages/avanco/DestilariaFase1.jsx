@@ -1,13 +1,30 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../lib/AuthContext'
 import { DISCIPLINAS_AVANCO } from '../../lib/avancoIntegradoConfig'
-import { fetchAvancoArquivos, fetchAvancoIndicadores, salvarDisciplinasDashboard } from '../../lib/avancoIntegradoData'
+import {
+  fetchAvancoArquivos,
+  fetchAvancoIndicadores,
+  fetchAvancoItensEquipamento,
+  fetchAvancoItensTubulacao,
+  salvarDisciplinasDashboard,
+} from '../../lib/avancoIntegradoData'
 import Spinner from '../../components/Spinner'
 import AvancoDashboard from '../../components/avanco/AvancoDashboard'
 import AvancoDataBase from '../../components/avanco/AvancoDataBase'
 import AvancoInput from '../../components/avanco/AvancoInput'
 
 const FASE = 'destilaria_fase_1'
+
+/** Agrupa uma lista plana (linhas de avanco_itens_tubulacao/avanco_itens_equipamento) num Map arquivo_id -> item[]. */
+function agruparPorArquivoId(lista) {
+  const mapa = new Map()
+  for (const item of lista) {
+    const atual = mapa.get(item.arquivo_id) ?? []
+    atual.push(item)
+    mapa.set(item.arquivo_id, atual)
+  }
+  return mapa
+}
 
 const ABAS = [
   { chave: 'dashboard', rotulo: 'Dashboard' },
@@ -28,6 +45,8 @@ export default function DestilariaFase1() {
   const [aba, setAba] = useState('dashboard')
   const [arquivos, setArquivos] = useState([])
   const [indicadoresPorArquivo, setIndicadoresPorArquivo] = useState(new Map())
+  const [itensTubulacaoPorArquivo, setItensTubulacaoPorArquivo] = useState(new Map())
+  const [itensEquipamentoPorArquivo, setItensEquipamentoPorArquivo] = useState(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -83,6 +102,35 @@ export default function DestilariaFase1() {
           mapa.set(item.arquivo_id, atual)
         }
         setIndicadoresPorArquivo(mapa)
+      })
+      .catch((err) => {
+        if (ativo) setError(err.message)
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [arquivos])
+
+  // Itens de tubulação/suportes + equipamentos extraídos dos .xlsx da
+  // QUALISOLDA (ver migration 0024/qualisoldaXlsxParse.js) — mesmo padrão
+  // do useEffect de indicadores da FORTYS acima, refeito sempre que
+  // `arquivos` muda.
+  useEffect(() => {
+    let ativo = true
+    const idsQualisolda = arquivos.filter((item) => item.empresa === 'QUALISOLDA').map((item) => item.id)
+
+    if (idsQualisolda.length === 0) {
+      setItensTubulacaoPorArquivo(new Map())
+      setItensEquipamentoPorArquivo(new Map())
+      return
+    }
+
+    Promise.all([fetchAvancoItensTubulacao(idsQualisolda), fetchAvancoItensEquipamento(idsQualisolda)])
+      .then(([itensTubulacao, itensEquipamento]) => {
+        if (!ativo) return
+        setItensTubulacaoPorArquivo(agruparPorArquivoId(itensTubulacao))
+        setItensEquipamentoPorArquivo(agruparPorArquivoId(itensEquipamento))
       })
       .catch((err) => {
         if (ativo) setError(err.message)
@@ -166,7 +214,13 @@ export default function DestilariaFase1() {
             salvando={salvandoDisciplinas}
           />
         ) : aba === 'dados' ? (
-          <AvancoDataBase fase={FASE} arquivos={arquivos} indicadoresPorArquivo={indicadoresPorArquivo} />
+          <AvancoDataBase
+            fase={FASE}
+            arquivos={arquivos}
+            indicadoresPorArquivo={indicadoresPorArquivo}
+            itensTubulacaoPorArquivo={itensTubulacaoPorArquivo}
+            itensEquipamentoPorArquivo={itensEquipamentoPorArquivo}
+          />
         ) : (
           <AvancoInput fase={FASE} arquivos={arquivos} user={user} profile={profile} onArquivoEnviado={handleArquivoEnviado} />
         )}

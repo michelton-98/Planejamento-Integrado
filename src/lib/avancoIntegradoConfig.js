@@ -36,6 +36,17 @@ export const DISCIPLINAS_AVANCO = ['Civil', 'Metal', 'Elétrica', 'Instrumentaç
 // ordem de exibição nas telas (Dashboard/Data_Base).
 export const INDICADORES_FORTYS = ['Colunas', 'Nível +5000', 'Nível +10000', 'Nível +15000', 'Escadas', 'Plataformas']
 
+// Os 2 escopos da QUALISOLDA (tipoInput 'xlsx_qualisolda', ver
+// AVANCO_CONFIG abaixo) mapeados pro "tipo" de arquivo/planilha que cada um
+// espera — decide qual parser rodar (ver src/lib/qualisoldaXlsxParse.js) a
+// partir do escopo escolhido na Input, nunca adivinhado pelo conteúdo do
+// arquivo. Nomes de escopo são a MESMA string usada em `escopos` abaixo —
+// não pode divergir.
+export const ESCOPO_TIPO_QUALISOLDA = {
+  'Interligação de Carbono': 'carbono',
+  'Interligação de Inox e Equipamentos': 'inox',
+}
+
 // Empresas -> config por disciplina, dentro de cada fase. Disciplina
 // ausente aqui (ou com `empresas: {}`) = ainda sem nenhuma empresa
 // cadastrada nessa fase (ver estado vazio do Dashboard/Data_Base).
@@ -43,10 +54,14 @@ export const INDICADORES_FORTYS = ['Colunas', 'Nível +5000', 'Nível +10000', '
 // Cada empresa tem `escopos` (lista de opções do seletor de Escopo) e
 // `tipoInput`:
 //   - 'generico': upload de qualquer arquivo, sem processamento (fluxo
-//     original da ferramenta — QUALISOLDA).
+//     original da ferramenta).
 //   - 'xml_ms_project': upload restrito a .xml do MS Project, com
-//     extração automática de indicadores no navegador (só FORTYS por
-//     enquanto — ver AvancoInput.jsx/fortysXmlParse.js).
+//     extração automática de indicadores no navegador (só FORTYS — ver
+//     AvancoInput.jsx/fortysXmlParse.js).
+//   - 'xlsx_qualisolda': upload restrito a .xlsx (um por escopo — ver
+//     ESCOPO_TIPO_QUALISOLDA acima), com extração automática de itens de
+//     tubulação/suportes/equipamentos no navegador (só QUALISOLDA — ver
+//     AvancoInput.jsx/qualisoldaXlsxParse.js).
 //
 // Propositalmente SEM check constraint equivalente no banco (ver migration
 // 0016): a lista de disciplinas/empresas/escopos válidos vive só aqui, pra
@@ -60,7 +75,7 @@ export const AVANCO_CONFIG = {
       habilitada: true,
       empresas: {
         QUALISOLDA: {
-          tipoInput: 'generico',
+          tipoInput: 'xlsx_qualisolda',
           escopos: ['Interligação de Carbono', 'Interligação de Inox e Equipamentos'],
         },
         FORTYS: {

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { buscarEmpresa, listarEmpresasDaFase } from '../../lib/avancoIntegradoConfig'
+import { ESCOPO_TIPO_QUALISOLDA, buscarEmpresa, listarEmpresasDaFase } from '../../lib/avancoIntegradoConfig'
 import { baixarArquivoAvanco } from '../../lib/avancoIntegradoData'
 import Card from '../Card'
 import Spinner from '../Spinner'
 import TabelaIndicadoresFortys, { formatarPercentualIndicador } from './TabelaIndicadoresFortys'
+import TabelaItensQualisolda, { TabelaItensEquipamento } from './TabelaItensQualisolda'
 
 function formatarDataBR(dataISO) {
   if (!dataISO) return '—'
@@ -23,7 +24,7 @@ function formatarTamanho(bytes) {
  * pro escopo. Cadastro/substituição de arquivo acontece só na aba Input
  * (ver AvancoInput.jsx); esta aba nunca escreve em avanco_arquivos.
  */
-export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo }) {
+export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo, itensTubulacaoPorArquivo, itensEquipamentoPorArquivo }) {
   const empresas = useMemo(() => listarEmpresasDaFase(fase), [fase])
   const [empresaSelecionada, setEmpresaSelecionada] = useState(empresas[0]?.empresa ?? '')
   const [dataSelecionada, setDataSelecionada] = useState('')
@@ -56,6 +57,20 @@ export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo }
       ? (arquivosDaEmpresa.find((item) => item.data_referencia === dataSelecionada) ?? null)
       : null
   const indicadoresCronograma = arquivoCronograma ? (indicadoresPorArquivo.get(arquivoCronograma.id) ?? []) : []
+
+  // QUALISOLDA (tipoInput 'xlsx_qualisolda'): cada escopo é seu próprio
+  // arquivo/planilha na mesma data — busca os 2 (Carbono/Inox)
+  // separadamente, cada um com seus próprios itens (ver migration 0024).
+  const ehQualisoldaXlsx = tipoInput === 'xlsx_qualisolda'
+  const arquivoCarbono = ehQualisoldaXlsx
+    ? (arquivosDaEmpresa.find((item) => ESCOPO_TIPO_QUALISOLDA[item.escopo] === 'carbono' && item.data_referencia === dataSelecionada) ?? null)
+    : null
+  const arquivoInox = ehQualisoldaXlsx
+    ? (arquivosDaEmpresa.find((item) => ESCOPO_TIPO_QUALISOLDA[item.escopo] === 'inox' && item.data_referencia === dataSelecionada) ?? null)
+    : null
+  const itensCarbono = arquivoCarbono ? (itensTubulacaoPorArquivo.get(arquivoCarbono.id) ?? []) : []
+  const itensTubulacaoInox = arquivoInox ? (itensTubulacaoPorArquivo.get(arquivoInox.id) ?? []) : []
+  const itensEquipamentoInox = arquivoInox ? (itensEquipamentoPorArquivo.get(arquivoInox.id) ?? []) : []
 
   const linhas = useMemo(
     () =>
@@ -144,68 +159,110 @@ export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo }
         </Card>
       )}
 
-      <Card faixaCor="#7c3aed" categoria={empresaSelecionada} titulo={dataSelecionada ? `Escopos em ${formatarDataBR(dataSelecionada)}` : 'Escopos'}>
-        {linhas.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-slate-400">Nenhum escopo cadastrado pra essa empresa.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
-            <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
-              <thead className="bg-gray-50 dark:bg-slate-700/50">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Escopo</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Status</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Arquivo</th>
-                  <th className="px-3 py-2 text-right font-medium text-gray-500 dark:text-slate-400">Ação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white dark:divide-slate-700 dark:bg-slate-800">
-                {linhas.map(({ escopo, arquivo }) => (
-                  <tr key={escopo}>
-                    <td className="px-3 py-2 text-navy dark:text-slate-100">{escopo}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          arquivo ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-slate-500'
-                        }`}
-                      >
-                        {arquivo ? 'Enviado' : 'Não enviado'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-gray-500 dark:text-slate-400">
-                      {arquivo ? (
-                        <>
-                          {arquivo.nome_arquivo}{' '}
-                          <span className="text-xs text-gray-400 dark:text-slate-500">{formatarTamanho(arquivo.tamanho_bytes)}</span>
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {arquivo?.storage_path ? (
-                        <button
-                          type="button"
-                          onClick={() => handleBaixar(arquivo)}
-                          disabled={baixandoEscopo === escopo}
-                          className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline disabled:opacity-50"
-                        >
-                          {baixandoEscopo === escopo && <Spinner className="h-3 w-3" />}
-                          Baixar
-                        </button>
-                      ) : (
-                        // Fluxo de cronograma (ver arquivoCronograma acima): não existe
-                        // arquivo pra baixar — o resumo já extraído (% geral + indicadores)
-                        // é o card "Avanço do cronograma" logo acima desta tabela.
-                        arquivo && <span className="text-xs text-gray-400 dark:text-slate-500">Ver resumo acima</span>
-                      )}
-                    </td>
+      {ehQualisoldaXlsx ? (
+        <>
+          {!arquivoCarbono && !arquivoInox && (
+            <Card faixaCor="#7c3aed" categoria={empresaSelecionada} titulo={dataSelecionada ? `Escopos em ${formatarDataBR(dataSelecionada)}` : 'Escopos'}>
+              <p className="text-sm text-gray-500 dark:text-slate-400">
+                {dataSelecionada ? 'Nenhum arquivo enviado nessa data.' : 'Nenhuma data com envio ainda.'}
+              </p>
+            </Card>
+          )}
+
+          {arquivoCarbono && (
+            <Card
+              faixaCor="#7c3aed"
+              categoria="Interligação de Carbono"
+              titulo={`Isométricos + Suportes — % Avanço geral: ${formatarPercentualIndicador(arquivoCarbono.percentual_executado_geral)}`}
+            >
+              <TabelaItensQualisolda itens={itensCarbono} />
+            </Card>
+          )}
+
+          {arquivoInox && (
+            <>
+              <Card
+                faixaCor="#7c3aed"
+                categoria="Interligação de Inox e Equipamentos"
+                titulo={`Tubulação + Suportes — % Avanço geral: ${formatarPercentualIndicador(arquivoInox.percentual_executado_geral)}`}
+              >
+                <TabelaItensQualisolda itens={itensTubulacaoInox} />
+              </Card>
+
+              <Card
+                faixaCor="#7c3aed"
+                categoria="Interligação de Inox e Equipamentos"
+                titulo={`Equipamentos — % Avanço: ${formatarPercentualIndicador(arquivoInox.percentual_equipamentos_geral)}`}
+              >
+                <TabelaItensEquipamento itens={itensEquipamentoInox} />
+              </Card>
+            </>
+          )}
+        </>
+      ) : (
+        <Card faixaCor="#7c3aed" categoria={empresaSelecionada} titulo={dataSelecionada ? `Escopos em ${formatarDataBR(dataSelecionada)}` : 'Escopos'}>
+          {linhas.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-slate-400">Nenhum escopo cadastrado pra essa empresa.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
+              <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
+                <thead className="bg-gray-50 dark:bg-slate-700/50">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Escopo</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Status</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-slate-400">Arquivo</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 dark:text-slate-400">Ação</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white dark:divide-slate-700 dark:bg-slate-800">
+                  {linhas.map(({ escopo, arquivo }) => (
+                    <tr key={escopo}>
+                      <td className="px-3 py-2 text-navy dark:text-slate-100">{escopo}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            arquivo ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-slate-500'
+                          }`}
+                        >
+                          {arquivo ? 'Enviado' : 'Não enviado'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 dark:text-slate-400">
+                        {arquivo ? (
+                          <>
+                            {arquivo.nome_arquivo}{' '}
+                            <span className="text-xs text-gray-400 dark:text-slate-500">{formatarTamanho(arquivo.tamanho_bytes)}</span>
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {arquivo?.storage_path ? (
+                          <button
+                            type="button"
+                            onClick={() => handleBaixar(arquivo)}
+                            disabled={baixandoEscopo === escopo}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline disabled:opacity-50"
+                          >
+                            {baixandoEscopo === escopo && <Spinner className="h-3 w-3" />}
+                            Baixar
+                          </button>
+                        ) : (
+                          // Fluxo de cronograma (ver arquivoCronograma acima): não existe
+                          // arquivo pra baixar — o resumo já extraído (% geral + indicadores)
+                          // é o card "Avanço do cronograma" logo acima desta tabela.
+                          arquivo && <span className="text-xs text-gray-400 dark:text-slate-500">Ver resumo acima</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   )
 }

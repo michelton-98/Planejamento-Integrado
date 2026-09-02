@@ -22,6 +22,11 @@ dist-ssr
 # ~90MB, e é dado real de obra).
 FORTYS-CR-CT-29489-REV13.xml
 
+# Idem, arquivos de exemplo reais (.xlsx) usados só pra validar o parser da
+# QUALISOLDA localmente — dado real de obra, não é pra entrar no repositório.
+Memorial de Calculo Destilaria RON Carbono QUALISOLDA RV9.xlsx
+Memorial de Calculo RON INOX_EQUIPAMENTOS QUALISOLDA RV12.xlsx
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

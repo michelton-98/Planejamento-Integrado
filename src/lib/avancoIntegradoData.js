@@ -36,6 +36,34 @@ export async function fetchAvancoIndicadores(arquivoIds) {
   return data ?? []
 }
 
+/**
+ * Busca os itens de tubulação/suportes extraídos dos .xlsx da QUALISOLDA
+ * (ver migration 0024 e qualisoldaXlsxParse.js) de uma lista de
+ * `avanco_arquivos.id` — usado pra montar `itensTubulacaoPorArquivo` (Map
+ * arquivo_id -> item[]) no DestilariaFase1.jsx.
+ */
+export async function fetchAvancoItensTubulacao(arquivoIds) {
+  if (!arquivoIds || arquivoIds.length === 0) return []
+
+  const { data, error } = await supabase.from('avanco_itens_tubulacao').select('*').in('arquivo_id', arquivoIds)
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Busca os itens de equipamentos extraídos do .xlsx do escopo Inox da
+ * QUALISOLDA (ver migration 0024 e qualisoldaXlsxParse.js) de uma lista de
+ * `avanco_arquivos.id` — usado pra montar `itensEquipamentoPorArquivo`
+ * (Map arquivo_id -> item[]) no DestilariaFase1.jsx.
+ */
+export async function fetchAvancoItensEquipamento(arquivoIds) {
+  if (!arquivoIds || arquivoIds.length === 0) return []
+
+  const { data, error } = await supabase.from('avanco_itens_equipamento').select('*').in('arquivo_id', arquivoIds)
+  if (error) throw error
+  return data ?? []
+}
+
 // Caminho no Storage: só ASCII/dígitos/hífen (nomes de empresa/escopo têm
 // acento e espaço) + um sufixo aleatório, pra nunca colidir mesmo em
 // reenvios rápidos da mesma combinação Empresa+Escopo+Data.
@@ -246,6 +274,115 @@ export async function enviarArquivoFortysXml({ escopo, dataReferencia, arquivo, 
   }
 
   return registrosSalvos
+}
+
+/**
+ * Envia um dos 2 .xlsx semanais da QUALISOLDA: mesmo espírito de
+ * enviarArquivoFortysXml — NÃO sobe o arquivo pro Storage (nunca sai do
+ * navegador, só é lido em memória pelo Worker, ver qualisoldaXlsxParse.js),
+ * `storage_path: null`. Um único registro em avanco_arquivos por Escopo+
+ * Data (ao contrário da FORTYS, aqui cada escopo já é seu próprio arquivo/
+ * upload — sem par fase1/fase2). `resultadoExtracao` é o retorno de
+ * parseQualisoldaXlsx: `{ itensTubulacao, percentualExecutadoGeral,
+ * percentualEquipamentosGeral, equipamentos? }` (equipamentos só existe pro
+ * escopo Inox).
+ *
+ * Reenvio da mesma combinação (via `registroExistente`, decidido pela UI —
+ * mesmo padrão do formulário genérico): atualiza a MESMA linha de
+ * avanco_arquivos e apaga+reinsere as linhas filhas das 2 tabelas novas
+ * (avanco_itens_tubulacao/avanco_itens_equipamento) pro arquivo_id.
+ */
+export async function enviarArquivoQualisoldaXlsx({ escopo, dataReferencia, arquivo, resultadoExtracao, registroExistente, user, profile }) {
+  const fase = 'destilaria_fase_1'
+  const disciplina = 'Metal'
+  const empresa = 'QUALISOLDA'
+
+  const dadosComuns = {
+    nome_arquivo: arquivo.name,
+    tamanho_bytes: arquivo.size,
+    storage_path: null,
+    percentual_previsto_geral: null,
+    percentual_executado_geral: resultadoExtracao.percentualExecutadoGeral,
+    percentual_equipamentos_geral: resultadoExtracao.percentualEquipamentosGeral,
+    enviado_por: user?.id ?? null,
+    enviado_por_nome: profile?.nome || null,
+    enviado_por_email: user?.email || null,
+  }
+
+  let registro
+  if (registroExistente) {
+    const { data, error } = await supabase.from('avanco_arquivos').update(dadosComuns).eq('id', registroExistente.id).select().single()
+    if (error) throw error
+    registro = data
+
+    // Registro de antes desta mudança pode ter um storage_path de um
+    // upload que esse fluxo não faz mais (ex.: combinação enviada antes de
+    // a extração automática existir) — limpa o objeto órfão, se houver.
+    if (registroExistente.storage_path) {
+      await supabase.storage.from(BUCKET_AVANCO).remove([registroExistente.storage_path])
+    }
+
+    const { error: erroLimparTub } = await supabase.from('avanco_itens_tubulacao').delete().eq('arquivo_id', registro.id)
+    if (erroLimparTub) throw erroLimparTub
+    const { error: erroLimparEquip } = await supabase.from('avanco_itens_equipamento').delete().eq('arquivo_id', registro.id)
+    if (erroLimparEquip) throw erroLimparEquip
+  } else {
+    const { data, error } = await supabase
+      .from('avanco_arquivos')
+      .insert({ fase, disciplina, empresa, escopo, data_referencia: dataReferencia, ...dadosComuns })
+      .select()
+      .single()
+    if (error) throw error
+    registro = data
+  }
+
+  try {
+    const itensTubulacao = (resultadoExtracao.itensTubulacao ?? []).map((item) => ({
+      arquivo_id: registro.id,
+      tipo_registro: item.tipoRegistro,
+      material: item.material,
+      area: item.area,
+      isometrico: item.isometrico,
+      diametro: item.diametro,
+      peso_total: item.pesoTotal,
+      peso_lista_material: item.pesoListaMaterial ?? null,
+      percentual_fabricacao: item.percentualFabricacao,
+      percentual_montagem: item.percentualMontagem,
+      percentual_pintura: item.percentualPintura,
+      percentual_total: item.percentualTotal,
+      peso_executado: item.pesoExecutado,
+    }))
+    if (itensTubulacao.length > 0) {
+      const { error } = await supabase.from('avanco_itens_tubulacao').insert(itensTubulacao)
+      if (error) throw error
+    }
+
+    const equipamentos = (resultadoExtracao.equipamentos ?? []).map((item) => ({
+      arquivo_id: registro.id,
+      tipo_equipamento: item.tipoEquipamento,
+      tag: item.tag,
+      classificacao: item.classificacao,
+      peso_total: item.pesoTotal,
+      percentual_icamento: item.percentualIcamento,
+      percentual_alinhamento: item.percentualAlinhamento,
+      percentual_fixacao: item.percentualFixacao,
+      percentual_total: item.percentualTotal,
+      peso_executado: item.pesoExecutado,
+    }))
+    if (equipamentos.length > 0) {
+      const { error } = await supabase.from('avanco_itens_equipamento').insert(equipamentos)
+      if (error) throw error
+    }
+  } catch (err) {
+    // Registro recém-criado (não um reenvio): desfaz pra não deixar
+    // avanco_arquivos órfão sem nenhuma linha filha.
+    if (!registroExistente) {
+      await supabase.from('avanco_arquivos').delete().eq('id', registro.id)
+    }
+    throw err
+  }
+
+  return registro
 }
 
 /** Baixa o arquivo de um registro (bucket privado — passa pela mesma RLS de leitura) e dispara o download no navegador. */
