@@ -9,6 +9,7 @@ import {
   salvarDisciplinasDashboard,
 } from '../../lib/avancoIntegradoData'
 import Spinner from '../../components/Spinner'
+import AvancoAtualizacao from '../../components/avanco/AvancoAtualizacao'
 import AvancoDashboard from '../../components/avanco/AvancoDashboard'
 import AvancoDataBase from '../../components/avanco/AvancoDataBase'
 import AvancoInput from '../../components/avanco/AvancoInput'
@@ -29,6 +30,7 @@ function agruparPorArquivoId(lista) {
 const ABAS = [
   { chave: 'dashboard', rotulo: 'Dashboard' },
   { chave: 'dados', rotulo: 'Data_Base' },
+  { chave: 'atualizacao', rotulo: 'Atualização' },
   { chave: 'input', rotulo: 'Input' },
 ]
 
@@ -172,6 +174,14 @@ export default function DestilariaFase1() {
     })
   }
 
+  // Depois de "Editar data" (ver EditarDataModal em AvancoDataBase.jsx):
+  // mesma atualização pontual do registro em memória, sem refetch — os
+  // itens filhos (avanco_itens_tubulacao/avanco_itens_equipamento)
+  // continuam vinculados pelo mesmo arquivo_id, não precisam de nada aqui.
+  function handleArquivoAtualizado(registro) {
+    setArquivos((atual) => atual.map((item) => (item.id === registro.id ? registro : item)))
+  }
+
   return (
     <main className="flex-1 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
@@ -218,6 +228,14 @@ export default function DestilariaFase1() {
             fase={FASE}
             arquivos={arquivos}
             indicadoresPorArquivo={indicadoresPorArquivo}
+            itensTubulacaoPorArquivo={itensTubulacaoPorArquivo}
+            itensEquipamentoPorArquivo={itensEquipamentoPorArquivo}
+            onArquivoAtualizado={handleArquivoAtualizado}
+          />
+        ) : aba === 'atualizacao' ? (
+          <AvancoAtualizacao
+            fase={FASE}
+            arquivos={arquivos}
             itensTubulacaoPorArquivo={itensTubulacaoPorArquivo}
             itensEquipamentoPorArquivo={itensEquipamentoPorArquivo}
           />

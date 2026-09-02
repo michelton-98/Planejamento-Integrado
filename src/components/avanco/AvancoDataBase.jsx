@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ESCOPO_TIPO_QUALISOLDA, buscarEmpresa, listarEmpresasDaFase } from '../../lib/avancoIntegradoConfig'
-import { baixarArquivoAvanco } from '../../lib/avancoIntegradoData'
+import { baixarArquivoAvanco, corrigirDataArquivo } from '../../lib/avancoIntegradoData'
+import { somarPesos } from '../../lib/qualisoldaAgrupamento'
 import Card from '../Card'
 import Spinner from '../Spinner'
+import { ResumoAgrupadoEstatico, SeletorAgrupar } from './ResumoAgrupado'
 import TabelaIndicadoresFortys, { formatarPercentualIndicador } from './TabelaIndicadoresFortys'
 import TabelaItensQualisolda, { TabelaItensEquipamento } from './TabelaItensQualisolda'
 
@@ -18,18 +20,198 @@ function formatarTamanho(bytes) {
   return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`
 }
 
+const CLASSE_CAMPO =
+  'w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:[color-scheme:dark]'
+
 /**
- * Aba "Data_Base": só leitura — mostra o "banco de dados" de arquivos por
- * empresa/data, com botão de baixar quando existir um arquivo cadastrado
- * pro escopo. Cadastro/substituição de arquivo acontece só na aba Input
- * (ver AvancoInput.jsx); esta aba nunca escreve em avanco_arquivos.
+ * Modal "Editar data" (botão no card de escopo/arquivo) — UPDATE simples
+ * em avanco_arquivos.data_referencia (ver corrigirDataArquivo), bloqueado
+ * com mensagem clara se já existir outro registro pra mesma Empresa+Escopo
+ * na data nova. Os itens filhos continuam vinculados pelo mesmo
+ * arquivo_id, não precisam de nada aqui.
  */
-export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo, itensTubulacaoPorArquivo, itensEquipamentoPorArquivo }) {
+function EditarDataModal({ arquivo, arquivosExistentes, onSalvo, onCancelar }) {
+  const [novaData, setNovaData] = useState(arquivo.data_referencia)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState(null)
+
+  async function handleSalvar() {
+    if (!novaData) {
+      setErro('Escolha uma data.')
+      return
+    }
+    setSalvando(true)
+    setErro(null)
+    try {
+      const registro = await corrigirDataArquivo({ arquivo, novaData, arquivosExistentes })
+      onSalvo(registro)
+    } catch (err) {
+      setErro(err.message)
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={salvando ? undefined : onCancelar} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Editar data de referência"
+        className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800"
+      >
+        <h3 className="mb-1 text-base font-semibold text-navy dark:text-slate-100">Editar data de referência</h3>
+        <p className="mb-3 text-sm text-gray-500 dark:text-slate-400">
+          {arquivo.empresa} — {arquivo.escopo}
+        </p>
+
+        <input type="date" value={novaData} onChange={(event) => setNovaData(event.target.value)} className={CLASSE_CAMPO} />
+
+        {erro && <p className="mt-2 text-sm text-alert">{erro}</p>}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancelar}
+            disabled={salvando}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSalvar}
+            disabled={salvando}
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+          >
+            {salvando && <Spinner className="h-3.5 w-3.5 text-white" />}
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BotaoEditarData({ onClick }) {
+  return (
+    <button type="button" onClick={onClick} className="text-xs font-medium text-accent hover:underline">
+      Editar data
+    </button>
+  )
+}
+
+const CLASSE_SUBABA = (ativa) =>
+  `-mb-px border-b-2 px-3 py-1.5 text-xs font-medium transition-colors ${
+    ativa
+      ? 'border-accent text-accent'
+      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-navy dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-100'
+  }`
+
+/**
+ * Card do escopo "Interligação de Carbono" (QUALISOLDA) — sempre 1 tabela
+ * só (isométricos + Suportes), sem subabas (Carbono nunca tem
+ * equipamentos).
+ */
+function CardCarbono({ arquivo, itens, onEditarData }) {
+  return (
+    <Card
+      faixaCor="#7c3aed"
+      categoria="Interligação de Carbono"
+      titulo={`Isométricos + Suportes — % Avanço geral: ${formatarPercentualIndicador(arquivo.percentual_executado_geral)}`}
+      acoes={<BotaoEditarData onClick={() => onEditarData(arquivo)} />}
+    >
+      <TabelaItensQualisolda itens={itens} />
+    </Card>
+  )
+}
+
+/**
+ * Card do escopo "Interligação de Inox e Equipamentos" (QUALISOLDA) — 2
+ * subabas: "Isométricos + Suportes" (igual ao card do Carbono) e
+ * "Equipamentos" (só existe/aparece quando há itens em
+ * avanco_itens_equipamento pra esse arquivo — na prática, sempre que o
+ * escopo é este), com 2 tabelas separadas (Equipamentos/Torres), cada uma
+ * com seu próprio % de avanço (peso executado ÷ peso total DAQUELE
+ * subconjunto).
+ */
+function CardInox({ arquivo, itensTubulacao, itensEquipamento, onEditarData }) {
+  const [subaba, setSubaba] = useState('itens')
+  const temEquipamentos = itensEquipamento.length > 0
+
+  const equipamentos = useMemo(() => itensEquipamento.filter((item) => item.classificacao === 'EQUIPAMENTO'), [itensEquipamento])
+  const torres = useMemo(() => itensEquipamento.filter((item) => item.classificacao === 'TORRE'), [itensEquipamento])
+  const resumoEquipamentos = useMemo(() => somarPesos(equipamentos), [equipamentos])
+  const resumoTorres = useMemo(() => somarPesos(torres), [torres])
+
+  const subabaAtiva = temEquipamentos ? subaba : 'itens'
+
+  return (
+    <Card
+      faixaCor="#7c3aed"
+      categoria="Interligação de Inox e Equipamentos"
+      titulo={
+        temEquipamentos
+          ? `Tub.+Suportes: ${formatarPercentualIndicador(arquivo.percentual_executado_geral)} · Equipamentos: ${formatarPercentualIndicador(arquivo.percentual_equipamentos_geral)}`
+          : `Tubulação + Suportes — % Avanço geral: ${formatarPercentualIndicador(arquivo.percentual_executado_geral)}`
+      }
+      acoes={<BotaoEditarData onClick={() => onEditarData(arquivo)} />}
+    >
+      {temEquipamentos && (
+        <div className="mb-4 flex gap-2 border-b border-gray-200 dark:border-slate-700">
+          <button type="button" onClick={() => setSubaba('itens')} className={CLASSE_SUBABA(subabaAtiva === 'itens')}>
+            Isométricos + Suportes
+          </button>
+          <button type="button" onClick={() => setSubaba('equipamentos')} className={CLASSE_SUBABA(subabaAtiva === 'equipamentos')}>
+            Equipamentos
+          </button>
+        </div>
+      )}
+
+      {subabaAtiva === 'itens' ? (
+        <TabelaItensQualisolda itens={itensTubulacao} />
+      ) : (
+        <div className="flex flex-col gap-5">
+          <div>
+            <p className="mb-2 text-sm font-medium text-navy dark:text-slate-100">
+              Equipamentos — % Avanço: {formatarPercentualIndicador(resumoEquipamentos.percentual)}
+            </p>
+            <TabelaItensEquipamento itens={equipamentos} />
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-medium text-navy dark:text-slate-100">
+              Torres — % Avanço: {formatarPercentualIndicador(resumoTorres.percentual)}
+            </p>
+            <TabelaItensEquipamento itens={torres} />
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+/**
+ * Aba "Data_Base": só leitura pros arquivos de empresas genéricas/FORTYS —
+ * a QUALISOLDA ganha edição da data de referência (ver EditarDataModal) e
+ * o resumo "Agrupar" (ver ResumoAgrupado.jsx), mas cadastro/substituição de
+ * arquivo continua só na aba Input (ver AvancoInput.jsx); esta aba nunca
+ * mexe nos itens filhos.
+ */
+export default function AvancoDataBase({
+  fase,
+  arquivos,
+  indicadoresPorArquivo,
+  itensTubulacaoPorArquivo,
+  itensEquipamentoPorArquivo,
+  onArquivoAtualizado,
+}) {
   const empresas = useMemo(() => listarEmpresasDaFase(fase), [fase])
   const [empresaSelecionada, setEmpresaSelecionada] = useState(empresas[0]?.empresa ?? '')
   const [dataSelecionada, setDataSelecionada] = useState('')
   const [baixandoEscopo, setBaixandoEscopo] = useState(null)
   const [erroDownload, setErroDownload] = useState(null)
+  const [agrupar, setAgrupar] = useState('')
+  const [edicaoData, setEdicaoData] = useState(null)
 
   const arquivosDaEmpresa = useMemo(
     () => arquivos.filter((arquivo) => arquivo.empresa === empresaSelecionada),
@@ -95,6 +277,14 @@ export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo, 
     }
   }
 
+  function handleDataSalva(registro) {
+    setEdicaoData(null)
+    onArquivoAtualizado(registro)
+    // A data mudou: se a nova data for diferente da selecionada no filtro,
+    // segue nela mesma (a combinação some da tela) — comportamento normal
+    // de qualquer edição, sem precisar de lógica extra.
+  }
+
   if (empresas.length === 0) {
     return <p className="text-sm text-gray-500 dark:text-slate-400">Nenhuma empresa cadastrada ainda nesta fase.</p>
   }
@@ -135,6 +325,8 @@ export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo, 
             </select>
           )}
         </label>
+
+        {ehQualisoldaXlsx && <SeletorAgrupar value={agrupar} onChange={setAgrupar} />}
       </div>
 
       {erroDownload && <p className="text-sm text-alert">{erroDownload}</p>}
@@ -160,45 +352,35 @@ export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo, 
       )}
 
       {ehQualisoldaXlsx ? (
-        <>
-          {!arquivoCarbono && !arquivoInox && (
-            <Card faixaCor="#7c3aed" categoria={empresaSelecionada} titulo={dataSelecionada ? `Escopos em ${formatarDataBR(dataSelecionada)}` : 'Escopos'}>
-              <p className="text-sm text-gray-500 dark:text-slate-400">
-                {dataSelecionada ? 'Nenhum arquivo enviado nessa data.' : 'Nenhuma data com envio ainda.'}
-              </p>
-            </Card>
-          )}
-
-          {arquivoCarbono && (
-            <Card
-              faixaCor="#7c3aed"
-              categoria="Interligação de Carbono"
-              titulo={`Isométricos + Suportes — % Avanço geral: ${formatarPercentualIndicador(arquivoCarbono.percentual_executado_geral)}`}
-            >
-              <TabelaItensQualisolda itens={itensCarbono} />
-            </Card>
-          )}
-
-          {arquivoInox && (
-            <>
-              <Card
-                faixaCor="#7c3aed"
-                categoria="Interligação de Inox e Equipamentos"
-                titulo={`Tubulação + Suportes — % Avanço geral: ${formatarPercentualIndicador(arquivoInox.percentual_executado_geral)}`}
-              >
-                <TabelaItensQualisolda itens={itensTubulacaoInox} />
+        agrupar ? (
+          <ResumoAgrupadoEstatico
+            opcao={agrupar}
+            itensCarbono={itensCarbono}
+            itensInox={itensTubulacaoInox}
+            itensEquipamento={itensEquipamentoInox}
+          />
+        ) : (
+          <>
+            {!arquivoCarbono && !arquivoInox && (
+              <Card faixaCor="#7c3aed" categoria={empresaSelecionada} titulo={dataSelecionada ? `Escopos em ${formatarDataBR(dataSelecionada)}` : 'Escopos'}>
+                <p className="text-sm text-gray-500 dark:text-slate-400">
+                  {dataSelecionada ? 'Nenhum arquivo enviado nessa data.' : 'Nenhuma data com envio ainda.'}
+                </p>
               </Card>
+            )}
 
-              <Card
-                faixaCor="#7c3aed"
-                categoria="Interligação de Inox e Equipamentos"
-                titulo={`Equipamentos — % Avanço: ${formatarPercentualIndicador(arquivoInox.percentual_equipamentos_geral)}`}
-              >
-                <TabelaItensEquipamento itens={itensEquipamentoInox} />
-              </Card>
-            </>
-          )}
-        </>
+            {arquivoCarbono && <CardCarbono arquivo={arquivoCarbono} itens={itensCarbono} onEditarData={setEdicaoData} />}
+
+            {arquivoInox && (
+              <CardInox
+                arquivo={arquivoInox}
+                itensTubulacao={itensTubulacaoInox}
+                itensEquipamento={itensEquipamentoInox}
+                onEditarData={setEdicaoData}
+              />
+            )}
+          </>
+        )
       ) : (
         <Card faixaCor="#7c3aed" categoria={empresaSelecionada} titulo={dataSelecionada ? `Escopos em ${formatarDataBR(dataSelecionada)}` : 'Escopos'}>
           {linhas.length === 0 ? (
@@ -262,6 +444,15 @@ export default function AvancoDataBase({ fase, arquivos, indicadoresPorArquivo, 
             </div>
           )}
         </Card>
+      )}
+
+      {edicaoData && (
+        <EditarDataModal
+          arquivo={edicaoData}
+          arquivosExistentes={arquivos}
+          onSalvo={handleDataSalva}
+          onCancelar={() => setEdicaoData(null)}
+        />
       )}
     </div>
   )

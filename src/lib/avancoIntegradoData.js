@@ -22,6 +22,33 @@ export async function fetchAvancoArquivos(fase) {
   return data ?? []
 }
 
+// O PostgREST (API do Supabase) devolve no máximo 1000 linhas por request,
+// mesmo sem LIMIT explícito no .select() — silenciosamente, sem erro. As
+// tabelas de itens da QUALISOLDA (avanco_itens_tubulacao/
+// avanco_itens_equipamento, migration 0024) passam fácil de 1000 linhas
+// somando só umas poucas semanas de histórico (~280-360 itens por arquivo
+// × várias datas × 2 escopos) — sem paginar, o fetch cortava o resultado no
+// meio, sumindo com itens (inclusive o resumo de Suportes, dependendo de
+// que arquivo_id caísse depois do corte) sem nenhum erro visível. Pagina em
+// blocos de 1000 via `.range()` até a página vir mais curta que o tamanho
+// pedido (fim real dos dados).
+const TAMANHO_PAGINA_SUPABASE = 1000
+
+async function fetchTodasLinhasPorArquivoId(tabela, arquivoIds) {
+  if (!arquivoIds || arquivoIds.length === 0) return []
+
+  const todasLinhas = []
+  for (let pagina = 0; ; pagina++) {
+    const inicio = pagina * TAMANHO_PAGINA_SUPABASE
+    const fim = inicio + TAMANHO_PAGINA_SUPABASE - 1
+    const { data, error } = await supabase.from(tabela).select('*').in('arquivo_id', arquivoIds).range(inicio, fim)
+    if (error) throw error
+    todasLinhas.push(...(data ?? []))
+    if (!data || data.length < TAMANHO_PAGINA_SUPABASE) break
+  }
+  return todasLinhas
+}
+
 /**
  * Busca os indicadores extraídos (ver migration 0019 e fortysXmlParse.js)
  * de uma lista de `avanco_arquivos.id` — usado pra montar
@@ -29,11 +56,7 @@ export async function fetchAvancoArquivos(fase) {
  * DestilariaFase1.jsx, sempre que a lista de arquivos muda.
  */
 export async function fetchAvancoIndicadores(arquivoIds) {
-  if (!arquivoIds || arquivoIds.length === 0) return []
-
-  const { data, error } = await supabase.from('avanco_indicadores').select('*').in('arquivo_id', arquivoIds)
-  if (error) throw error
-  return data ?? []
+  return fetchTodasLinhasPorArquivoId('avanco_indicadores', arquivoIds)
 }
 
 /**
@@ -43,11 +66,7 @@ export async function fetchAvancoIndicadores(arquivoIds) {
  * arquivo_id -> item[]) no DestilariaFase1.jsx.
  */
 export async function fetchAvancoItensTubulacao(arquivoIds) {
-  if (!arquivoIds || arquivoIds.length === 0) return []
-
-  const { data, error } = await supabase.from('avanco_itens_tubulacao').select('*').in('arquivo_id', arquivoIds)
-  if (error) throw error
-  return data ?? []
+  return fetchTodasLinhasPorArquivoId('avanco_itens_tubulacao', arquivoIds)
 }
 
 /**
@@ -57,11 +76,7 @@ export async function fetchAvancoItensTubulacao(arquivoIds) {
  * (Map arquivo_id -> item[]) no DestilariaFase1.jsx.
  */
 export async function fetchAvancoItensEquipamento(arquivoIds) {
-  if (!arquivoIds || arquivoIds.length === 0) return []
-
-  const { data, error } = await supabase.from('avanco_itens_equipamento').select('*').in('arquivo_id', arquivoIds)
-  if (error) throw error
-  return data ?? []
+  return fetchTodasLinhasPorArquivoId('avanco_itens_equipamento', arquivoIds)
 }
 
 // Caminho no Storage: só ASCII/dígitos/hífen (nomes de empresa/escopo têm
@@ -398,6 +413,46 @@ export async function baixarArquivoAvanco(registro) {
   link.click()
   link.remove()
   URL.revokeObjectURL(url)
+}
+
+/**
+ * Corrige a data de referência de um avanco_arquivos já cadastrado (botão
+ * "Editar data" em AvancoDataBase.jsx) — UPDATE simples só na coluna
+ * data_referencia; os itens filhos (avanco_itens_tubulacao/
+ * avanco_itens_equipamento, migration 0024, quando existirem) continuam
+ * vinculados pelo mesmo arquivo_id, não precisam ser tocados. A policy de
+ * UPDATE de avanco_arquivos (migration 0016) já é aberta a qualquer
+ * aprovado — nenhuma migration nova precisou ser criada pra isso.
+ *
+ * Bloqueia ANTES de tentar o UPDATE se já existir outro registro pra mesma
+ * Fase+Disciplina+Empresa+Escopo na data nova (`arquivosExistentes` é o
+ * estado em memória já carregado, ver DestilariaFase1.jsx — evita round-trip
+ * só pra checar). O `unique` de avanco_arquivos (migration 0016) cobre a
+ * mesma combinação no banco — o catch do código 23505 é só o fallback pra
+ * uma corrida rara (2 pessoas corrigindo ao mesmo tempo).
+ */
+export async function corrigirDataArquivo({ arquivo, novaData, arquivosExistentes }) {
+  const conflito = arquivosExistentes.some(
+    (item) =>
+      item.id !== arquivo.id &&
+      item.fase === arquivo.fase &&
+      item.disciplina === arquivo.disciplina &&
+      item.empresa === arquivo.empresa &&
+      item.escopo === arquivo.escopo &&
+      item.data_referencia === novaData,
+  )
+  if (conflito) {
+    throw new Error('Já existe um arquivo cadastrado pra essa combinação nessa data. Apague o outro registro antes de corrigir a data.')
+  }
+
+  const { data, error } = await supabase.from('avanco_arquivos').update({ data_referencia: novaData }).eq('id', arquivo.id).select().single()
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('Já existe um arquivo cadastrado pra essa combinação nessa data. Apague o outro registro antes de corrigir a data.')
+    }
+    throw error
+  }
+  return data
 }
 
 /**

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { formatarPeso } from '../../lib/qualisoldaAgrupamento'
 import { SUPORTES_LABEL } from '../../lib/qualisoldaXlsxParse'
 import { formatarPercentualIndicador } from './TabelaIndicadoresFortys'
 
@@ -6,11 +7,6 @@ import { formatarPercentualIndicador } from './TabelaIndicadoresFortys'
 // qualisoldaXlsxParse.js) — compartilhadas entre AvancoDataBase e
 // AvancoDashboard (embora o Dashboard só use os agregados, não estas
 // tabelas — ver PARTE 3 do prompt original: "Dashboard: só os agregados").
-
-function formatarPeso(valor) {
-  if (valor === null || valor === undefined) return '—'
-  return Number(valor).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
-}
 
 const CLASSE_BUSCA =
   'w-full max-w-xs rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-accent focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100'

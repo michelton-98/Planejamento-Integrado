@@ -10,6 +10,7 @@ export default function Card({
   faixaCor = '#12263f',
   categoria,
   titulo,
+  acoes,
   children,
   className = '',
   contentClassName = 'p-5 print:p-3',
@@ -27,10 +28,16 @@ export default function Card({
             {categoria}
           </p>
         )}
-        {titulo && (
-          <h3 className={`text-sm font-medium text-navy dark:text-slate-100 ${children ? 'mb-4 print:mb-2' : ''}`}>
-            {titulo}
-          </h3>
+        {(titulo || acoes) && (
+          // `acoes` (ex.: botão "Editar data" no card de escopo do Avanço
+          // Integrado, ver AvancoDataBase.jsx): fica ao lado do título, fora
+          // do <h3> (heading não deveria conter botão) — opcional, não
+          // muda o markup de quem só passa `titulo` (comportamento igual
+          // ao de antes).
+          <div className={`flex items-start justify-between gap-3 ${children ? 'mb-4 print:mb-2' : ''}`}>
+            {titulo && <h3 className="text-sm font-medium text-navy dark:text-slate-100">{titulo}</h3>}
+            {acoes && <div className="flex shrink-0 items-center gap-2 print:hidden">{acoes}</div>}
+          </div>
         )}
         {children}
       </div>
