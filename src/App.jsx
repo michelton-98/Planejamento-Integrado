@@ -16,6 +16,7 @@ import Input from './pages/Input'
 import Validacoes from './pages/Validacoes'
 import AvancoIntegrado from './pages/AvancoIntegrado'
 import DestilariaFase1 from './pages/avanco/DestilariaFase1'
+import DestilariaFase2 from './pages/avanco/DestilariaFase2'
 import Histograma from './pages/Histograma'
 import AdminUsuarios from './pages/admin/AdminUsuarios'
 
@@ -137,6 +138,16 @@ function App() {
                 <AppLayout>
                   <ProtectedRoute ferramenta="avanco_integrado">
                     <DestilariaFase1 />
+                  </ProtectedRoute>
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/avanco-integrado/destilaria-fase-2"
+              element={
+                <AppLayout>
+                  <ProtectedRoute ferramenta="avanco_integrado">
+                    <DestilariaFase2 />
                   </ProtectedRoute>
                 </AppLayout>
               }

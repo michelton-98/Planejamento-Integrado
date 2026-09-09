@@ -3,6 +3,7 @@ import { AVANCO_CONFIG, DISCIPLINAS_AVANCO, ESCOPO_TIPO_QUALISOLDA } from '../..
 import { calcularAvancoPorEmpresa } from '../../lib/avancoIntegradoData'
 import Card from '../Card'
 import Spinner from '../Spinner'
+import GestaoVisual from './GestaoVisual'
 import TabelaIndicadoresFortys, { formatarPercentualIndicador } from './TabelaIndicadoresFortys'
 
 function formatarDataBR(dataISO) {
@@ -224,6 +225,8 @@ export default function AvancoDashboard({
   fase,
   arquivos,
   indicadoresPorArquivo,
+  itensTubulacaoPorArquivo,
+  itensEquipamentoPorArquivo,
   disciplinasSelecionadas,
   onAlterarDisciplinas,
   salvando,
@@ -282,6 +285,16 @@ export default function AvancoDashboard({
             indicadoresPorArquivo={indicadoresPorArquivo}
           />
         ))
+      )}
+
+      {/* Painel "Gestão Visual": só em Destilaria Fase I (ver prompt original) — as demais fases continuam só com os indicadores por disciplina acima. */}
+      {fase === 'destilaria_fase_1' && (
+        <GestaoVisual
+          arquivos={arquivos}
+          indicadoresPorArquivo={indicadoresPorArquivo}
+          itensTubulacaoPorArquivo={itensTubulacaoPorArquivo}
+          itensEquipamentoPorArquivo={itensEquipamentoPorArquivo}
+        />
       )}
     </div>
   )

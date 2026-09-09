@@ -1,3 +1,4 @@
+import { FASES_AVANCO } from './avancoIntegradoConfig'
 import { supabase } from './supabaseClient'
 
 // Ferramenta "Avanço Integrado": tabela avanco_arquivos + bucket de
@@ -175,41 +176,48 @@ export async function enviarArquivoAvanco({
 /**
  * Envia o cronograma .xml da FORTYS: NÃO sobe o arquivo pro Storage — ele
  * nunca sai do navegador, só é lido em memória pelo Worker (ver
- * fortysXmlParse.js) pra extrair os percentuais. Grava/atualiza DOIS
- * registros em avanco_arquivos a partir do resultado da extração — um com
- * fase 'destilaria_fase_1' e outro com 'destilaria_fase_2' (ver migration
- * 0016 pra fase/disciplina/empresa sem check constraint) — ambos com
- * `storage_path: null` (ver migration 0022, que tornou essa coluna
- * nullable); `nome_arquivo`/`tamanho_bytes` continuam gravados, só como
- * referência de qual arquivo original gerou aqueles números, nunca o
- * conteúdo em si. `resultadoExtracao` é o retorno de parseFortysXml (ver
- * fortysXmlParse.js): `{ fase1, fase2 }`, cada um com
- * percentualPrevistoGeral/percentualExecutadoGeral + indicadores[].
+ * fortysXmlParse.js) pra extrair os percentuais. O cronograma é um .xml
+ * ÚNICO que cobre as 5 fases de FASES_AVANCO na mesma árvore de tarefas —
+ * grava/atualiza um registro em avanco_arquivos POR FASE ENCONTRADA COM
+ * INDICADORES VÁLIDOS (`resultadoExtracao[fase.chave].encontrada` e pelo
+ * menos 1 indicador reconhecido; ver parseFortysXmlTexto) — fase sem seção
+ * no arquivo, ou cuja seção não bate com nenhum dos 6 indicadores
+ * conhecidos (ex.: Clarificação/Extração de Óleo no cronograma atual, que
+ * só têm uma tarefa genérica de "Etapa 1"), simplesmente não é tocada, não
+ * é erro. Todo registro sai com `storage_path: null` (ver migration 0022,
+ * que tornou essa coluna nullable); `nome_arquivo`/`tamanho_bytes`
+ * continuam gravados, só como referência de qual arquivo original gerou
+ * aqueles números, nunca o conteúdo em si. `resultadoExtracao` é o retorno
+ * de parseFortysXml (ver fortysXmlParse.js): `{ [chaveDaFase]: resultado }`,
+ * cada um com percentualPrevistoGeral/percentualExecutadoGeral +
+ * indicadores[].
  *
  * Ao contrário de enviarArquivoAvanco (genérico), aqui a checagem de
  * "já existe arquivo pra essa combinação" é feita NO BANCO, não a partir
- * do estado em memória do front — a página só carrega arquivos da Fase I
- * (fase='destilaria_fase_1'), então não teria como saber se já existe
- * registro da Fase II pra essa mesma Empresa+Escopo+Data.
+ * do estado em memória do front — a página que chama isto só carrega
+ * arquivos da PRÓPRIA fase, então não teria como saber se já existe
+ * registro de OUTRA fase pra essa mesma Empresa+Escopo+Data.
+ *
+ * Devolve `{ [chaveDaFase]: registro }`, só com as chaves das fases
+ * efetivamente gravadas/atualizadas (quem chama decide o que fazer com
+ * `registros[faseDaTela]`, ver AvancoInput.jsx).
  */
 export async function enviarArquivoFortysXml({ escopo, dataReferencia, arquivo, resultadoExtracao, user, profile }) {
   const disciplina = 'Metal'
   const empresa = 'FORTYS'
+  const chavesDasFases = FASES_AVANCO.map((fase) => fase.chave)
 
   const { data: existentes, error: erroExistentes } = await supabase
     .from('avanco_arquivos')
     .select('*')
-    .in('fase', ['destilaria_fase_1', 'destilaria_fase_2'])
+    .in('fase', chavesDasFases)
     .eq('disciplina', disciplina)
     .eq('empresa', empresa)
     .eq('escopo', escopo)
     .eq('data_referencia', dataReferencia)
 
   if (erroExistentes) throw erroExistentes
-  const existentePorFase = {
-    fase1: existentes.find((registro) => registro.fase === 'destilaria_fase_1') ?? null,
-    fase2: existentes.find((registro) => registro.fase === 'destilaria_fase_2') ?? null,
-  }
+  const existentePorFase = new Map(existentes.map((registro) => [registro.fase, registro]))
 
   const dadosComuns = {
     nome_arquivo: arquivo.name,
@@ -224,16 +232,18 @@ export async function enviarArquivoFortysXml({ escopo, dataReferencia, arquivo, 
   const idsInseridosParaDesfazer = []
 
   try {
-    for (const [chave, faseId] of [
-      ['fase1', 'destilaria_fase_1'],
-      ['fase2', 'destilaria_fase_2'],
-    ]) {
-      const extraido = resultadoExtracao[chave]
-      const existente = existentePorFase[chave]
+    for (const faseId of chavesDasFases) {
+      const extraido = resultadoExtracao[faseId]
+      // Fase não encontrada no arquivo, ou encontrada sem nenhum dos 6
+      // indicadores reconhecidos: não mexe no registro dessa fase (se já
+      // existir um de um envio anterior, continua como está).
+      if (!extraido?.encontrada || extraido.indicadores.length === 0) continue
+
+      const existente = existentePorFase.get(faseId) ?? null
       const payload = {
         ...dadosComuns,
-        percentual_previsto_geral: extraido?.percentualPrevistoGeral ?? null,
-        percentual_executado_geral: extraido?.percentualExecutadoGeral ?? null,
+        percentual_previsto_geral: extraido.percentualPrevistoGeral,
+        percentual_executado_geral: extraido.percentualExecutadoGeral,
       }
 
       let registro
@@ -264,18 +274,16 @@ export async function enviarArquivoFortysXml({ escopo, dataReferencia, arquivo, 
         idsInseridosParaDesfazer.push(registro.id)
       }
 
-      const indicadores = (extraido?.indicadores ?? []).map((item) => ({
+      const indicadores = extraido.indicadores.map((item) => ({
         arquivo_id: registro.id,
         nome_indicador: item.nome,
         percentual_previsto: item.percentualPrevisto,
         percentual_executado: item.percentualExecutado,
       }))
-      if (indicadores.length > 0) {
-        const { error: erroIndicadores } = await supabase.from('avanco_indicadores').insert(indicadores)
-        if (erroIndicadores) throw erroIndicadores
-      }
+      const { error: erroIndicadores } = await supabase.from('avanco_indicadores').insert(indicadores)
+      if (erroIndicadores) throw erroIndicadores
 
-      registrosSalvos[chave] = registro
+      registrosSalvos[faseId] = registro
     }
   } catch (err) {
     // Desfaz o que deu pra desfazer antes de propagar o erro: registros
@@ -383,6 +391,7 @@ export async function enviarArquivoQualisoldaXlsx({ escopo, dataReferencia, arqu
       percentual_fixacao: item.percentualFixacao,
       percentual_total: item.percentualTotal,
       peso_executado: item.pesoExecutado,
+      trocador_calor_barras: item.trocadorCalorBarras ?? false,
     }))
     if (equipamentos.length > 0) {
       const { error } = await supabase.from('avanco_itens_equipamento').insert(equipamentos)

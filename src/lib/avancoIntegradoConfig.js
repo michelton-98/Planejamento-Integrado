@@ -11,17 +11,50 @@
 // As 5 "fases" do sub-painel do card "Avanço Integrado". `chave` também é
 // o valor gravado na coluna `fase` de avanco_arquivos — não muda depois de
 // criado (é só um identificador interno, nunca exibido cru na tela).
+//
+// `nomeTarefaFortys`: nome (sem diferenciar maiúsculas/acentos) da
+// tarefa-resumo dessa fase dentro do cronograma único .xml da FORTYS — o
+// mesmo arquivo cobre as 5 fases numa única árvore de tarefas, cada uma
+// numa seção própria (ver src/lib/fortysXmlParse.js, que varre o arquivo
+// INTEIRO procurando as 5 de uma vez, não só a da tela onde o usuário
+// enviou o arquivo). Fase sem seção encontrada no arquivo simplesmente não
+// é atualizada — não é erro.
 export const FASES_AVANCO = [
   {
     chave: 'destilaria_fase_1',
     titulo: 'Destilaria Fase I',
     href: '/avanco-integrado/destilaria-fase-1',
     habilitada: true,
+    nomeTarefaFortys: 'DESTILARIA FASE I',
   },
-  { chave: 'destilaria_fase_2', titulo: 'Destilaria Fase II', href: null, habilitada: false },
-  { chave: 'clarificacao_oleo', titulo: 'Clarificação de Óleo', href: null, habilitada: false },
-  { chave: 'extracao_oleo_fase_1', titulo: 'Extração de Óleo Fase I', href: null, habilitada: false },
-  { chave: 'extracao_oleo_fase_2', titulo: 'Extração de Óleo Fase II', href: null, habilitada: false },
+  {
+    chave: 'destilaria_fase_2',
+    titulo: 'Destilaria Fase II',
+    href: '/avanco-integrado/destilaria-fase-2',
+    habilitada: true,
+    nomeTarefaFortys: 'DESTILARIA FASE II',
+  },
+  {
+    chave: 'clarificacao_oleo',
+    titulo: 'Clarificação de Óleo',
+    href: null,
+    habilitada: false,
+    nomeTarefaFortys: 'CLARIFICAÇÃO DE ÓLEO',
+  },
+  {
+    chave: 'extracao_oleo_fase_1',
+    titulo: 'Extração de Óleo Fase I',
+    href: null,
+    habilitada: false,
+    nomeTarefaFortys: 'EXTRAÇÃO DE ÓLEO FASE I',
+  },
+  {
+    chave: 'extracao_oleo_fase_2',
+    titulo: 'Extração de Óleo Fase II',
+    href: null,
+    habilitada: false,
+    nomeTarefaFortys: 'EXTRAÇÃO DE ÓLEO FASE II',
+  },
 ]
 
 // As 4 disciplinas do checklist do Dashboard e dos cards da aba Input —
@@ -78,6 +111,24 @@ export const AVANCO_CONFIG = {
           tipoInput: 'xlsx_qualisolda',
           escopos: ['Interligação de Carbono', 'Interligação de Inox e Equipamentos'],
         },
+        FORTYS: {
+          tipoInput: 'xml_ms_project',
+          escopos: ['Prédio (Estrutura Principal)'],
+        },
+      },
+    },
+    Elétrica: { habilitada: false, empresas: {} },
+    Instrumentação: { habilitada: false, empresas: {} },
+  },
+  // Mesma estrutura de destilaria_fase_1 (Dashboard/Data_Base/Atualização/
+  // Input), mas por enquanto só a FORTYS está habilitada aqui — a
+  // QUALISOLDA ainda não tem escopo cadastrado pra Fase II (não mexer nisso
+  // até ela ser configurada num próximo prompt).
+  destilaria_fase_2: {
+    Civil: { habilitada: false, empresas: {} },
+    Metal: {
+      habilitada: true,
+      empresas: {
         FORTYS: {
           tipoInput: 'xml_ms_project',
           escopos: ['Prédio (Estrutura Principal)'],

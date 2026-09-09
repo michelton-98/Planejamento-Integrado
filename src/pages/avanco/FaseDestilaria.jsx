@@ -1,0 +1,251 @@
+import { useEffect, useState } from 'react'
+import { useAuth } from '../../lib/AuthContext'
+import { DISCIPLINAS_AVANCO } from '../../lib/avancoIntegradoConfig'
+import {
+  fetchAvancoArquivos,
+  fetchAvancoIndicadores,
+  fetchAvancoItensEquipamento,
+  fetchAvancoItensTubulacao,
+  salvarDisciplinasDashboard,
+} from '../../lib/avancoIntegradoData'
+import Spinner from '../../components/Spinner'
+import AvancoAtualizacao from '../../components/avanco/AvancoAtualizacao'
+import AvancoDashboard from '../../components/avanco/AvancoDashboard'
+import AvancoDataBase from '../../components/avanco/AvancoDataBase'
+import AvancoInput from '../../components/avanco/AvancoInput'
+
+/** Agrupa uma lista plana (linhas de avanco_itens_tubulacao/avanco_itens_equipamento) num Map arquivo_id -> item[]. */
+function agruparPorArquivoId(lista) {
+  const mapa = new Map()
+  for (const item of lista) {
+    const atual = mapa.get(item.arquivo_id) ?? []
+    atual.push(item)
+    mapa.set(item.arquivo_id, atual)
+  }
+  return mapa
+}
+
+const ABAS = [
+  { chave: 'dashboard', rotulo: 'Dashboard' },
+  { chave: 'dados', rotulo: 'Data_Base' },
+  { chave: 'atualizacao', rotulo: 'Atualização' },
+  { chave: 'input', rotulo: 'Input' },
+]
+
+/**
+ * Ferramenta genérica de UMA fase da Destilaria (/avanco-integrado/
+ * destilaria-fase-1 e /destilaria-fase-2, ver src/pages/avanco/
+ * DestilariaFase1.jsx e DestilariaFase2.jsx — cada um só passa `fase`/
+ * `titulo` fixos pra este componente): 4 abas sobre a mesma tabela
+ * avanco_arquivos (ver migration 0016), filtrada por `fase`. O fetch e as
+ * mutações moram aqui (não nas abas), mesmo espírito do Validacoes.jsx —
+ * todas as abas sempre veem o mesmo estado em memória, sem refetch ao
+ * trocar de aba.
+ */
+export default function FaseDestilaria({ fase, titulo }) {
+  const { user, profile, refreshProfile } = useAuth()
+
+  const [aba, setAba] = useState('dashboard')
+  const [arquivos, setArquivos] = useState([])
+  const [indicadoresPorArquivo, setIndicadoresPorArquivo] = useState(new Map())
+  const [itensTubulacaoPorArquivo, setItensTubulacaoPorArquivo] = useState(new Map())
+  const [itensEquipamentoPorArquivo, setItensEquipamentoPorArquivo] = useState(new Map())
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Filtro de disciplinas do Dashboard: nulo/ausente no perfil = "todas
+  // marcadas" (primeiro acesso e padrão histórico, ver migration 0018).
+  // Guardado em estado local pra resposta imediata do checkbox; persistido
+  // no perfil (salvarDisciplinasDashboard) a cada alteração, sincronizado
+  // entre qualquer computador que o usuário use pra entrar no sistema.
+  const [disciplinasSelecionadas, setDisciplinasSelecionadas] = useState(DISCIPLINAS_AVANCO)
+  const [salvandoDisciplinas, setSalvandoDisciplinas] = useState(false)
+
+  useEffect(() => {
+    let ativo = true
+    setLoading(true)
+    setError(null)
+
+    fetchAvancoArquivos(fase)
+      .then((lista) => {
+        if (ativo) setArquivos(lista)
+      })
+      .catch((err) => {
+        if (ativo) setError(err.message)
+      })
+      .finally(() => {
+        if (ativo) setLoading(false)
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [fase])
+
+  // Indicadores extraídos do cronograma (ver migration 0019), só existem
+  // pra arquivos da FORTYS (tipoInput 'xml_ms_project') — refeito sempre
+  // que `arquivos` muda (carga inicial ou depois de um upload novo), pra
+  // Dashboard e Data_Base sempre lerem a versão mais recente.
+  useEffect(() => {
+    let ativo = true
+    const idsFortys = arquivos.filter((item) => item.empresa === 'FORTYS').map((item) => item.id)
+
+    if (idsFortys.length === 0) {
+      setIndicadoresPorArquivo(new Map())
+      return
+    }
+
+    fetchAvancoIndicadores(idsFortys)
+      .then((lista) => {
+        if (!ativo) return
+        const mapa = new Map()
+        for (const item of lista) {
+          const atual = mapa.get(item.arquivo_id) ?? []
+          atual.push(item)
+          mapa.set(item.arquivo_id, atual)
+        }
+        setIndicadoresPorArquivo(mapa)
+      })
+      .catch((err) => {
+        if (ativo) setError(err.message)
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [arquivos])
+
+  // Itens de tubulação/suportes + equipamentos extraídos dos .xlsx da
+  // QUALISOLDA (ver migration 0024/qualisoldaXlsxParse.js) — mesmo padrão
+  // do useEffect de indicadores da FORTYS acima, refeito sempre que
+  // `arquivos` muda.
+  useEffect(() => {
+    let ativo = true
+    const idsQualisolda = arquivos.filter((item) => item.empresa === 'QUALISOLDA').map((item) => item.id)
+
+    if (idsQualisolda.length === 0) {
+      setItensTubulacaoPorArquivo(new Map())
+      setItensEquipamentoPorArquivo(new Map())
+      return
+    }
+
+    Promise.all([fetchAvancoItensTubulacao(idsQualisolda), fetchAvancoItensEquipamento(idsQualisolda)])
+      .then(([itensTubulacao, itensEquipamento]) => {
+        if (!ativo) return
+        setItensTubulacaoPorArquivo(agruparPorArquivoId(itensTubulacao))
+        setItensEquipamentoPorArquivo(agruparPorArquivoId(itensEquipamento))
+      })
+      .catch((err) => {
+        if (ativo) setError(err.message)
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [arquivos])
+
+  // Reflete o filtro salvo no perfil sempre que ele mudar (login em outro
+  // computador, refreshProfile após salvar aqui mesmo etc.).
+  useEffect(() => {
+    setDisciplinasSelecionadas(profile?.avanco_dashboard_disciplinas ?? DISCIPLINAS_AVANCO)
+  }, [profile?.avanco_dashboard_disciplinas])
+
+  async function handleAlterarDisciplinas(novaLista) {
+    // "Todas marcadas" grava null no perfil (ver salvarDisciplinasDashboard)
+    // pra disciplinas futuras entrarem automaticamente selecionadas.
+    const paraSalvar = novaLista.length === DISCIPLINAS_AVANCO.length ? null : novaLista
+    const anterior = disciplinasSelecionadas
+    setDisciplinasSelecionadas(novaLista)
+    setSalvandoDisciplinas(true)
+    try {
+      await salvarDisciplinasDashboard(paraSalvar)
+      await refreshProfile()
+    } catch (err) {
+      setDisciplinasSelecionadas(anterior)
+      setError(err.message)
+    } finally {
+      setSalvandoDisciplinas(false)
+    }
+  }
+
+  function handleArquivoEnviado(registro) {
+    setArquivos((atual) => {
+      const existe = atual.some((item) => item.id === registro.id)
+      return existe ? atual.map((item) => (item.id === registro.id ? registro : item)) : [registro, ...atual]
+    })
+  }
+
+  // Depois de "Editar data" (ver EditarDataModal em AvancoDataBase.jsx):
+  // mesma atualização pontual do registro em memória, sem refetch — os
+  // itens filhos (avanco_itens_tubulacao/avanco_itens_equipamento)
+  // continuam vinculados pelo mesmo arquivo_id, não precisam de nada aqui.
+  function handleArquivoAtualizado(registro) {
+    setArquivos((atual) => atual.map((item) => (item.id === registro.id ? registro : item)))
+  }
+
+  return (
+    <main className="flex-1 p-4 sm:p-6">
+      <div className="mx-auto max-w-5xl">
+        <h1 className="mb-1 text-lg font-semibold text-navy dark:text-slate-100">{titulo}</h1>
+        <p className="mb-4 text-sm text-gray-500 dark:text-slate-400">
+          Avanço físico por disciplina e empresa — envio de arquivos e indicadores de cobertura.
+        </p>
+
+        <div className="mb-4 flex gap-2 border-b border-gray-200 dark:border-slate-700">
+          {ABAS.map((item) => (
+            <button
+              key={item.chave}
+              type="button"
+              onClick={() => setAba(item.chave)}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                aba === item.chave
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-navy dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-100'
+              }`}
+            >
+              {item.rotulo}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
+            <Spinner className="h-4 w-4" />
+            Carregando...
+          </div>
+        ) : error ? (
+          <p className="text-sm text-alert">{error}</p>
+        ) : aba === 'dashboard' ? (
+          <AvancoDashboard
+            fase={fase}
+            arquivos={arquivos}
+            indicadoresPorArquivo={indicadoresPorArquivo}
+            itensTubulacaoPorArquivo={itensTubulacaoPorArquivo}
+            itensEquipamentoPorArquivo={itensEquipamentoPorArquivo}
+            disciplinasSelecionadas={disciplinasSelecionadas}
+            onAlterarDisciplinas={handleAlterarDisciplinas}
+            salvando={salvandoDisciplinas}
+          />
+        ) : aba === 'dados' ? (
+          <AvancoDataBase
+            fase={fase}
+            arquivos={arquivos}
+            indicadoresPorArquivo={indicadoresPorArquivo}
+            itensTubulacaoPorArquivo={itensTubulacaoPorArquivo}
+            itensEquipamentoPorArquivo={itensEquipamentoPorArquivo}
+            onArquivoAtualizado={handleArquivoAtualizado}
+          />
+        ) : aba === 'atualizacao' ? (
+          <AvancoAtualizacao
+            fase={fase}
+            arquivos={arquivos}
+            itensTubulacaoPorArquivo={itensTubulacaoPorArquivo}
+            itensEquipamentoPorArquivo={itensEquipamentoPorArquivo}
+          />
+        ) : (
+          <AvancoInput fase={fase} arquivos={arquivos} user={user} profile={profile} onArquivoEnviado={handleArquivoEnviado} />
+        )}
+      </div>
+    </main>
+  )
+}

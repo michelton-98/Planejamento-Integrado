@@ -191,10 +191,14 @@ function CardInox({ arquivo, itensTubulacao, itensEquipamento, onEditarData }) {
 }
 
 /**
- * Aba "Data_Base": só leitura pros arquivos de empresas genéricas/FORTYS —
- * a QUALISOLDA ganha edição da data de referência (ver EditarDataModal) e
- * o resumo "Agrupar" (ver ResumoAgrupado.jsx), mas cadastro/substituição de
- * arquivo continua só na aba Input (ver AvancoInput.jsx); esta aba nunca
+ * Aba "Data_Base": leitura dos arquivos de qualquer empresa/escopo, com
+ * edição da data de referência (ver EditarDataModal/BotaoEditarData) —
+ * disponível pra QUALQUER Empresa (QUALISOLDA nos cards Carbono/Inox, e
+ * FORTYS/genérica na tabela de escopos abaixo), mesma lógica de bloqueio de
+ * duplicidade e mesma policy de UPDATE (migration 0016, aberta a todo
+ * aprovado — nada específico de QUALISOLDA no banco). A QUALISOLDA também
+ * ganha o resumo "Agrupar" (ver ResumoAgrupado.jsx); cadastro/substituição
+ * de arquivo continua só na aba Input (ver AvancoInput.jsx); esta aba nunca
  * mexe nos itens filhos.
  */
 export default function AvancoDataBase({
@@ -420,22 +424,25 @@ export default function AvancoDataBase({
                         )}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        {arquivo?.storage_path ? (
-                          <button
-                            type="button"
-                            onClick={() => handleBaixar(arquivo)}
-                            disabled={baixandoEscopo === escopo}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline disabled:opacity-50"
-                          >
-                            {baixandoEscopo === escopo && <Spinner className="h-3 w-3" />}
-                            Baixar
-                          </button>
-                        ) : (
-                          // Fluxo de cronograma (ver arquivoCronograma acima): não existe
-                          // arquivo pra baixar — o resumo já extraído (% geral + indicadores)
-                          // é o card "Avanço do cronograma" logo acima desta tabela.
-                          arquivo && <span className="text-xs text-gray-400 dark:text-slate-500">Ver resumo acima</span>
-                        )}
+                        <div className="flex items-center justify-end gap-3">
+                          {arquivo?.storage_path ? (
+                            <button
+                              type="button"
+                              onClick={() => handleBaixar(arquivo)}
+                              disabled={baixandoEscopo === escopo}
+                              className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline disabled:opacity-50"
+                            >
+                              {baixandoEscopo === escopo && <Spinner className="h-3 w-3" />}
+                              Baixar
+                            </button>
+                          ) : (
+                            // Fluxo de cronograma (ver arquivoCronograma acima): não existe
+                            // arquivo pra baixar — o resumo já extraído (% geral + indicadores)
+                            // é o card "Avanço do cronograma" logo acima desta tabela.
+                            arquivo && <span className="text-xs text-gray-400 dark:text-slate-500">Ver resumo acima</span>
+                          )}
+                          {arquivo && <BotaoEditarData onClick={() => setEdicaoData(arquivo)} />}
+                        </div>
                       </td>
                     </tr>
                   ))}

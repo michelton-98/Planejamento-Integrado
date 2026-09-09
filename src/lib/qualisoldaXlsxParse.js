@@ -242,6 +242,11 @@ const COLS_TUBULACAO_INOX = {
 
 const EQUIPAMENTOS_START_ROW = 13 // linha 14 (1-indexed)
 
+/** Coluna N: marcação manual de engenharia "Trocador de Calor de Barras" — "SIM" (sem diferenciar maiúsculas) vira true, qualquer outro valor (inclusive vazio) vira false. Independente de tipo_equipamento/classificacao — ver migration 0025. */
+function ehTrocadorCalorBarras(valor) {
+  return normalizar(valor) === 'SIM'
+}
+
 /** Lê os itens de "MC Equipamentos" — para quando a coluna C (TAG) fica vazia (linha de totais). CONDENSADOR entra como EQUIPAMENTO (só existe 1 item assim hoje). */
 function lerEquipamentos(linhas) {
   const itens = []
@@ -269,6 +274,7 @@ function lerEquipamentos(linhas) {
       percentualFixacao: paraPercentual(celula(linhas, linha, 9)), // J
       percentualTotal: paraPercentual(celula(linhas, linha, 10)), // K
       pesoExecutado: paraNumero(celula(linhas, linha, 11)) ?? 0, // L
+      trocadorCalorBarras: ehTrocadorCalorBarras(celula(linhas, linha, 13)), // N
     })
 
     linha++

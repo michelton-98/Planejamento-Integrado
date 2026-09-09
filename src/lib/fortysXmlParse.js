@@ -1,4 +1,4 @@
-import { INDICADORES_FORTYS } from './avancoIntegradoConfig'
+import { FASES_AVANCO, INDICADORES_FORTYS } from './avancoIntegradoConfig'
 
 // Extrai os indicadores de avanço (% previsto x % executado) do cronograma
 // MS Project (.xml, schema padrão MSPDI) da FORTYS. Roda dentro de um Web
@@ -29,8 +29,6 @@ import { INDICADORES_FORTYS } from './avancoIntegradoConfig'
 
 const FIELDNAME_PREVISTO = 'Número2'
 const FIELDNAME_EXECUTADO = 'Número3'
-const NOME_FASE_1 = 'DESTILARIA FASE I'
-const NOME_FASE_2 = 'DESTILARIA FASE II'
 
 const REGEX_ACENTOS_NFD = new RegExp('[̀-ͯ]', 'g')
 
@@ -255,7 +253,19 @@ const FASE_NAO_ENCONTRADA = {
   faltantes: [...INDICADORES_FORTYS],
 }
 
-/** Núcleo puro (sem I/O): recebe o texto já lido do arquivo e devolve `{ fase1, fase2 }`. */
+/**
+ * Núcleo puro (sem I/O): recebe o texto já lido do arquivo e devolve um
+ * objeto `{ [chaveDaFase]: resultado }`, uma chave por fase de
+ * FASES_AVANCO (destilaria_fase_1, destilaria_fase_2, clarificacao_oleo,
+ * extracao_oleo_fase_1, extracao_oleo_fase_2) — o cronograma da FORTYS é um
+ * .xml ÚNICO que cobre as 5 fases dentro da mesma árvore de tarefas (ver
+ * `nomeTarefaFortys` em avancoIntegradoConfig.js), então varremos TODAS de
+ * uma vez, não só a fase da tela onde o usuário enviou o arquivo. Fase cuja
+ * seção não é encontrada no arquivo entra como FASE_NAO_ENCONTRADA — não é
+ * erro, ver enviarArquivoFortysXml (só grava/atualiza a fase que veio
+ * `encontrada`). Só lança erro se NENHUMA das 5 seções for encontrada (sinal
+ * de que o arquivo não é o cronograma esperado).
+ */
 export function parseFortysXmlTexto(xmlTexto) {
   if (!xmlTexto.includes('<Project')) {
     throw new Error('Não foi possível ler este arquivo como XML. Confirme se é um cronograma exportado do MS Project.')
@@ -263,22 +273,19 @@ export function parseFortysXmlTexto(xmlTexto) {
 
   const tarefas = lerTarefas(xmlTexto)
 
-  // Fase I é obrigatória: é a única com tela própria habilitada hoje.
-  const resumoFase1 = encontrarResumoFase(tarefas, NOME_FASE_1)
-  if (!resumoFase1) {
-    throw new Error(`Não foi encontrada a seção "${NOME_FASE_1}" neste arquivo.`)
-  }
-  const fase1 = extrairFase(tarefas, resumoFase1)
-  if (fase1.faltantes.length > 0) {
-    throw new Error(`Não foram localizados os seguintes indicadores da Destilaria Fase I: ${fase1.faltantes.join(', ')}.`)
+  const resultado = {}
+  for (const fase of FASES_AVANCO) {
+    const resumo = encontrarResumoFase(tarefas, fase.nomeTarefaFortys)
+    resultado[fase.chave] = resumo ? extrairFase(tarefas, resumo) : FASE_NAO_ENCONTRADA
   }
 
-  // Fase II é complementar (ainda sem tela própria): se não achar a seção,
-  // só pula a extração — não bloqueia o upload.
-  const resumoFase2 = encontrarResumoFase(tarefas, NOME_FASE_2)
-  const fase2 = resumoFase2 ? extrairFase(tarefas, resumoFase2) : FASE_NAO_ENCONTRADA
+  if (Object.values(resultado).every((item) => !item.encontrada)) {
+    throw new Error(
+      `Não foi encontrada nenhuma das seções esperadas (${FASES_AVANCO.map((f) => f.nomeTarefaFortys).join(', ')}) neste arquivo.`,
+    )
+  }
 
-  return { fase1, fase2 }
+  return resultado
 }
 
 /** Lê o arquivo (File/Blob) como texto e extrai — ponto de entrada usado pelo worker. */

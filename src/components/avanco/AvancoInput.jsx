@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AVANCO_CONFIG, DISCIPLINAS_AVANCO, ESCOPO_TIPO_QUALISOLDA } from '../../lib/avancoIntegradoConfig'
+import { AVANCO_CONFIG, DISCIPLINAS_AVANCO, ESCOPO_TIPO_QUALISOLDA, FASES_AVANCO } from '../../lib/avancoIntegradoConfig'
 import {
   TAMANHO_MAXIMO_BYTES,
   TAMANHO_MAXIMO_BYTES_FORTYS,
@@ -234,11 +234,16 @@ function FormularioGenericoMetal({ empresa, escopos, arquivos, user, profile, on
 // Formulário da FORTYS: só aceita .xml do MS Project (até 150 MB),
 // processado inteiramente no navegador (Web Worker, ver
 // fortysXmlWorkerClient/fortysXmlParse.js) — o arquivo NUNCA é enviado ao
-// Storage, só lido em memória; só o resultado da extração (avanço geral +
-// 6 indicadores, de Fase I e Fase II) vira o payload de
-// enviarArquivoFortysXml. Escopo é fixo (hoje só existe "Prédio (Estrutura
-// Principal)"): mostrado como texto, não como seletor.
-function FormularioFortysXml({ empresa, escopos, arquivos, user, profile, onArquivoEnviado }) {
+// Storage, só lido em memória; só o resultado da extração (avanço geral + 6
+// indicadores, de TODAS as fases encontradas no cronograma — ver
+// FASES_AVANCO/fortysXmlParse.js) vira o payload de enviarArquivoFortysXml.
+// Escopo é fixo (hoje só existe "Prédio (Estrutura Principal)"): mostrado
+// como texto, não como seletor. `fase` é a fase da TELA onde este
+// formulário está montado — decide qual chave de `registros` (um por fase
+// gravada) volta pro estado local da página via onArquivoEnviado; as
+// demais fases gravadas só aparecem quando o usuário navegar até a tela
+// delas (cada uma faz o próprio fetch).
+function FormularioFortysXml({ fase, empresa, escopos, arquivos, user, profile, onArquivoEnviado }) {
   const escopo = escopos[0] ?? ''
 
   const [dataReferencia, setDataReferencia] = useState('')
@@ -304,8 +309,15 @@ function FormularioFortysXml({ empresa, escopos, arquivos, user, profile, onArqu
         user,
         profile,
       })
-      onArquivoEnviado(registros.fase1)
-      setSucesso(`Cronograma enviado para ${empresa} — ${escopo} (${formatarDataBR(dataReferencia)}).`)
+      // Só a fase desta TELA entra no estado local (ver comentário acima do
+      // componente) — se o cronograma não trouxe indicadores válidos pra
+      // ela (mas trouxe pra alguma outra), não há registro pra refletir
+      // aqui; a mensagem de sucesso abaixo já deixa isso claro.
+      if (registros[fase]) onArquivoEnviado(registros[fase])
+      const fasesGravadas = FASES_AVANCO.filter((item) => registros[item.chave]).map((item) => item.titulo)
+      setSucesso(
+        `Cronograma processado para ${empresa} — ${escopo} (${formatarDataBR(dataReferencia)}). Fases atualizadas: ${fasesGravadas.join(', ')}.`,
+      )
       limparFormularioParcial()
     } catch (err) {
       setErro(err.message)
@@ -387,18 +399,18 @@ function FormularioFortysXml({ empresa, escopos, arquivos, user, profile, onArqu
 
             {resultadoExtracao && !processando && (
               <div className="mt-2 flex flex-col gap-1 text-xs text-gray-600 dark:text-slate-300">
-                <p>
-                  <span className="font-medium text-navy dark:text-slate-100">Destilaria Fase I:</span>{' '}
-                  {formatarPercentualIndicador(resultadoExtracao.fase1.percentualPrevistoGeral)} previsto ×{' '}
-                  {formatarPercentualIndicador(resultadoExtracao.fase1.percentualExecutadoGeral)} executado ·{' '}
-                  {resultadoExtracao.fase1.indicadores.length}/6 indicadores encontrados
-                </p>
-                <p>
-                  <span className="font-medium text-navy dark:text-slate-100">Destilaria Fase II:</span>{' '}
-                  {resultadoExtracao.fase2.encontrada
-                    ? `${formatarPercentualIndicador(resultadoExtracao.fase2.percentualPrevistoGeral)} previsto × ${formatarPercentualIndicador(resultadoExtracao.fase2.percentualExecutadoGeral)} executado · ${resultadoExtracao.fase2.indicadores.length}/6 indicadores encontrados`
-                    : 'seção não encontrada neste arquivo (não bloqueia o envio)'}
-                </p>
+                {FASES_AVANCO.map((item) => {
+                  const extraido = resultadoExtracao[item.chave]
+                  const seraGravada = extraido?.encontrada && extraido.indicadores.length > 0
+                  return (
+                    <p key={item.chave}>
+                      <span className="font-medium text-navy dark:text-slate-100">{item.titulo}:</span>{' '}
+                      {seraGravada
+                        ? `${formatarPercentualIndicador(extraido.percentualPrevistoGeral)} previsto × ${formatarPercentualIndicador(extraido.percentualExecutadoGeral)} executado · ${extraido.indicadores.length}/6 indicadores encontrados`
+                        : 'seção não encontrada ou sem indicadores reconhecidos neste arquivo (não bloqueia o envio, essa fase não é atualizada)'}
+                    </p>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -676,6 +688,7 @@ function InputMetal({ fase, arquivos, user, profile, onArquivoEnviado }) {
       {configEmpresa?.tipoInput === 'xml_ms_project' ? (
         <FormularioFortysXml
           key={empresa}
+          fase={fase}
           empresa={empresa}
           escopos={configEmpresa.escopos}
           arquivos={arquivos}
